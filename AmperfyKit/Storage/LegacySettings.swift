@@ -376,9 +376,18 @@ extension PersistentStorage {
     @MainActor
     public var albumsGridSizeSetting: Int {
       get {
-        UserDefaults.standard
-          .object(forKey: UserDefaultsKey.AlbumsGridSizeSetting.rawValue) as? Int ??
-          ((UIDevice.current.userInterfaceIdiom == .pad) ? 4 : 3)
+        if let stored = UserDefaults.standard
+          .object(forKey: UserDefaultsKey.AlbumsGridSizeSetting.rawValue) as? Int {
+          return stored
+        }
+        switch UIDevice.current.userInterfaceIdiom {
+        case .phone:
+          return 3
+        case .mac:
+          return 6
+        default:
+          return 4
+        }
       }
       set { UserDefaults.standard.set(
         newValue,
@@ -623,7 +632,7 @@ extension PersistentStorage {
     public var isReplayGainEnabled: Bool {
       get {
         UserDefaults.standard
-          .object(forKey: UserDefaultsKey.IsReplayGainEnabled.rawValue) as? Bool ?? true
+          .object(forKey: UserDefaultsKey.IsReplayGainEnabled.rawValue) as? Bool ?? false
       }
       set {
         UserDefaults.standard.set(newValue, forKey: UserDefaultsKey.IsReplayGainEnabled.rawValue)

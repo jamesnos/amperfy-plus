@@ -121,7 +121,7 @@ class BackendAudioPlayer: NSObject {
   public private(set) var audioAnalyzer: AudioAnalyzer
 
   // ReplayGain Settings
-  private var isReplayGainEnabled: Bool = true
+  private var isReplayGainEnabled: Bool = false
   private var currentReplayGainValue: Float = 0.0 // ReplayGain in dB
   // EQ Settings
   private var equalizerVolumeCompensation: Float = 1.0
@@ -595,7 +595,7 @@ class BackendAudioPlayer: NSObject {
     eventLogger.info(
       topic: "Player Info",
       statusCode: .playerError,
-      message: "Content type \"\(contentType)\" of \"\(playableDisplayTitle)\" is not playable via Amperfy. Activating transcoding in Settings could resolve this issue.",
+      message: "Content type \"\(contentType)\" of \"\(playableDisplayTitle)\" is not playable via Amperfy+. Activating transcoding in Settings could resolve this issue.",
       displayPopup: true
     )
     responder?.notifyItemPreparationFinished()

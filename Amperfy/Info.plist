@@ -10,12 +10,14 @@
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Amperfy+</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>$(PRODUCT_NAME)</string>
+	<string>Amperfy+</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -39,9 +41,9 @@
 	<array>
 		<dict>
 			<key>INAlternativeAppName</key>
-			<string>Amperfy Music</string>
+			<string>Amperfy+ Music</string>
 			<key>INAlternativeAppNamePronunciationHint</key>
-			<string>amperfy music</string>
+			<string>amperfy plus music</string>
 		</dict>
 	</array>
 	<key>INIntentsSupported</key>

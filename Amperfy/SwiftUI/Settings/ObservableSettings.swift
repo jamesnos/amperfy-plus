@@ -26,13 +26,13 @@ final class Settings: ObservableObject {
   @Published
   var isOfflineMode = false
   @Published
-  var isShowDetailedInfo = false
+  var isShowDetailedInfo = true
   @Published
-  var isShowSongDuration = false
+  var isShowSongDuration = true
   @Published
-  var isShowAlbumDuration = false
+  var isShowAlbumDuration = true
   @Published
-  var isShowArtistDuration = false
+  var isShowArtistDuration = true
   @Published
   var isShowRating = false
   @Published
@@ -55,21 +55,21 @@ final class Settings: ObservableObject {
   @Published
   var isAutoCacheLatestPodcastEpisodes = false
   @Published
-  var isPlayerAutoCachePlayedItems = false
+  var isPlayerAutoCachePlayedItems = true
   @Published
   var isScrobbleStreamedItems = false
   @Published
   var isPlaybackStartOnlyOnPlay = false
   @Published
-  var isPlayerSongPlaybackResumeEnabled = false
+  var isPlayerSongPlaybackResumeEnabled = true
   @Published
-  var isShowMusicPlayerSkipButtons = false
+  var isShowMusicPlayerSkipButtons = true
   @Published
   var isLyricsSmoothScrolling = true
   @Published
   var swipeActionSettings = SwipeActionSettings(leading: [], trailing: [])
   @Published
-  var cacheSizeLimit: Int = 0 // limit in byte
+  var cacheSizeLimit: Int = 2_000_000_000 // limit in byte (2 GB decimal)
   @Published
   var isHapticsEnabled = true
 
@@ -88,7 +88,7 @@ final class Settings: ObservableObject {
   var equalizerSettings: [EqualizerSetting] = []
 
   @Published
-  var isReplayGainEnabled = true
+  var isReplayGainEnabled = false
 
   @Published
   var isMiniPlayerAlwaysOnTop = false

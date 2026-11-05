@@ -70,6 +70,52 @@
         setLevel(nsWindow, setLevelSel, level)
       }
     }
+
+    /// Expand the key/main NSWindow to fill its screen (zoom), excluding mini-player/settings.
+    @MainActor
+    static func fillMainWindowToVisibleScreen() {
+      guard let appClass = NSClassFromString("NSApplication") as? NSObject.Type else { return }
+      guard let app = appClass
+        .perform(NSSelectorFromString("sharedApplication"))?
+        .takeUnretainedValue()
+      else { return }
+
+      let excluded: Set<String> = [
+        MiniPlayerSceneDelegate.sceneTitle,
+        windowSettingsTitle,
+      ]
+
+      let candidates: [AnyObject] = {
+        var list: [AnyObject] = []
+        if let key = (app as AnyObject)
+          .perform(NSSelectorFromString("keyWindow"))?
+          .takeUnretainedValue() as AnyObject? {
+          list.append(key)
+        }
+        if let main = (app as AnyObject)
+          .perform(NSSelectorFromString("mainWindow"))?
+          .takeUnretainedValue() as AnyObject? {
+          list.append(main)
+        }
+        if let windows = (app as AnyObject)
+          .perform(NSSelectorFromString("windows"))?
+          .takeUnretainedValue() as? [AnyObject] {
+          list.append(contentsOf: windows)
+        }
+        return list
+      }()
+
+      let zoomSel = NSSelectorFromString("zoom:")
+      for nsWindow in candidates {
+        let title = nsWindow
+          .perform(NSSelectorFromString("title"))?
+          .takeUnretainedValue() as? String
+        if let title, excluded.contains(title) { continue }
+        // NSWindow.zoom(_:) toggles to the standard zoomed (near full-screen) frame.
+        _ = nsWindow.perform(zoomSel, with: nil)
+        return
+      }
+    }
   }
 
 #endif

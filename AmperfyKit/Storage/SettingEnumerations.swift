@@ -125,7 +125,7 @@ public enum StreamingFormatPreference: Int, CaseIterable, Sendable, Codable {
   case raw = 1
   case serverConfig = 2 // omit the format to let the server decide which codec should be used
 
-  public static let defaultValue: StreamingFormatPreference = .mp3
+  public static let defaultValue: StreamingFormatPreference = .raw
 
   public var shortInfo: String {
     switch self {
@@ -141,7 +141,7 @@ public enum StreamingFormatPreference: Int, CaseIterable, Sendable, Codable {
   public var description: String {
     switch self {
     case .mp3:
-      return "mp3 (default)"
+      return "mp3"
     case .raw:
       return "Raw/Original"
     case .serverConfig:
@@ -269,7 +269,7 @@ public enum ThemePreference: Int, CaseIterable, Sendable, Codable {
   case orange = 4
   case purple = 5
 
-  public static let defaultValue: ThemePreference = .blue
+  public static let defaultValue: ThemePreference = .red
 
   public var description: String {
     switch self {
@@ -347,12 +347,12 @@ public enum CacheTranscodingFormatPreference: Int, CaseIterable, Sendable, Codab
   case mp3 = 1
   case serverConfig = 2 // omit the format to let the server decide which codec should be used
 
-  public static let defaultValue: CacheTranscodingFormatPreference = .mp3
+  public static let defaultValue: CacheTranscodingFormatPreference = .raw
 
   public var description: String {
     switch self {
     case .mp3:
-      return "mp3 (default)"
+      return "mp3"
     case .raw:
       return "Raw/Original"
     case .serverConfig:

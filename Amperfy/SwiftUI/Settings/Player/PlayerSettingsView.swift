@@ -201,7 +201,7 @@ struct PlayerSettingsView: View {
             .loginCredentials?.backendApi
             .asServerApiType == .ampache ? "" :
             """
-            For 'raw', Amperfy uses the Subsonic API's 'download' action, which skips transcoding. Other formats use the 'stream' action, which requires proper server configuration for transcoding.
+            For 'raw', Amperfy+ uses the Subsonic API's 'download' action, which skips transcoding. Other formats use the 'stream' action, which requires proper server configuration for transcoding.
             """
         )
         """)

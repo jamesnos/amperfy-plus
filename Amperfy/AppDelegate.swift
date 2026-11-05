@@ -37,7 +37,7 @@ let defaultWindowActivityType = "amperfy.main"
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
-  static let name = "Amperfy"
+  static let name = "Amperfy+"
   static var version: String {
     (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? ""
   }
@@ -236,8 +236,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
   func restartByUser() {
     Task {
       await localNotificationManager.notifyDebugAndWait(
-        title: "Amperfy Restart",
-        body: "Tap to reopen Amperfy"
+        title: "Amperfy+ Restart",
+        body: "Tap to reopen Amperfy+"
       )
       stopForInit()
       // close Amperfy
@@ -286,7 +286,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     os_log(
-      "Amperfy Cache Location: %s",
+      "Amperfy+ Cache Location: %s",
       log: self.log,
       type: .info,
       CacheFileManager.shared.getAmperfyPath() ?? "-"

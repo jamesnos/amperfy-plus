@@ -77,25 +77,25 @@ public struct UserSettings: Sendable, Codable {
     set { _cacheTranscodingFormatPreference = newValue }
   }
 
-  private var _isShowDetailedInfo: Bool = false
+  private var _isShowDetailedInfo: Bool = true
   public var isShowDetailedInfo: Bool {
     get { _isShowDetailedInfo }
     set { _isShowDetailedInfo = newValue }
   }
 
-  private var _isShowSongDuration: Bool = false
+  private var _isShowSongDuration: Bool = true
   public var isShowSongDuration: Bool {
     get { _isShowSongDuration }
     set { _isShowSongDuration = newValue }
   }
 
-  private var _isShowAlbumDuration: Bool = false
+  private var _isShowAlbumDuration: Bool = true
   public var isShowAlbumDuration: Bool {
     get { _isShowAlbumDuration }
     set { _isShowAlbumDuration = newValue }
   }
 
-  private var _isShowArtistDuration: Bool = false
+  private var _isShowArtistDuration: Bool = true
   public var isShowArtistDuration: Bool {
     get { _isShowArtistDuration }
     set { _isShowArtistDuration = newValue }
@@ -113,7 +113,7 @@ public struct UserSettings: Sendable, Codable {
     set { _isPlayerShuffleButtonEnabled = newValue }
   }
 
-  private var _isShowMusicPlayerSkipButtons: Bool = false
+  private var _isShowMusicPlayerSkipButtons: Bool = true
   public var isShowMusicPlayerSkipButtons: Bool {
     get { _isShowMusicPlayerSkipButtons }
     set { _isShowMusicPlayerSkipButtons = newValue }
@@ -125,8 +125,8 @@ public struct UserSettings: Sendable, Codable {
     set { _isLyricsSmoothScrolling = newValue }
   }
 
-  // limit in byte
-  private var _cacheLimit: Int = 0
+  // limit in byte (2 GB decimal)
+  private var _cacheLimit: Int = 2_000_000_000
   public var cacheLimit: Int {
     get { _cacheLimit }
     set { _cacheLimit = newValue }
@@ -166,7 +166,7 @@ public struct UserSettings: Sendable, Codable {
     set { _isPlaybackStartOnlyOnPlay = newValue }
   }
 
-  private var _isPlayerSongPlaybackResumeEnabled: Bool = false
+  private var _isPlayerSongPlaybackResumeEnabled: Bool = true
   public var isPlayerSongPlaybackResumeEnabled: Bool {
     get { _isPlayerSongPlaybackResumeEnabled }
     set { _isPlayerSongPlaybackResumeEnabled = newValue }
@@ -202,7 +202,7 @@ public struct UserSettings: Sendable, Codable {
     set { _equalizerSettings = newValue }
   }
 
-  private var _isReplayGainEnabled: Bool = true
+  private var _isReplayGainEnabled: Bool = false
   public var isReplayGainEnabled: Bool {
     get { _isReplayGainEnabled }
     set { _isReplayGainEnabled = newValue }
@@ -307,7 +307,15 @@ public struct UserSettings: Sendable, Codable {
   @MainActor
   public var albumsGridSizeSetting: Int {
     get {
-      _albumsGridSizeSetting ?? ((UIDevice.current.userInterfaceIdiom == .pad) ? 4 : 3)
+      if let _albumsGridSizeSetting { return _albumsGridSizeSetting }
+      switch UIDevice.current.userInterfaceIdiom {
+      case .phone:
+        return 3
+      case .mac:
+        return 6
+      default:
+        return 4
+      }
     }
     set { _albumsGridSizeSetting = newValue }
   }
@@ -468,7 +476,7 @@ public struct AccountSettings: Sendable, Codable {
   }
 
   private var themeColorForNextNewAccount: ThemePreference {
-    var theme = ThemePreference.blue
+    var theme = ThemePreference.defaultValue
     let usedThemes = Set(_accounts.compactMap { $0.value.themePreference })
     let allThemes = Set(ThemePreference.allCases)
     let availableThemes = allThemes.subtracting(usedThemes)
@@ -477,7 +485,7 @@ public struct AccountSettings: Sendable, Codable {
     } else if let activeAccount = _activeAccount {
       let activeTheme = getSetting(activeAccount).read.themePreference
       theme = allThemes.subtracting(Set([activeTheme])).sorted(by: { $0.rawValue < $1.rawValue })
-        .first ?? .blue
+        .first ?? .defaultValue
     }
     return theme
   }

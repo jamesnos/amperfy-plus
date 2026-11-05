@@ -6,10 +6,14 @@
 #
 # Optional env:
 #   CONFIG=Release              # default Release
+#   VERSION=0.1.0               # marketing version stamped into the app + DMG name
 #   DEVELOPMENT_TEAM=XXXXXXXX   # if you have an Apple Development cert, use it
 #   BUNDLE_ID=com.example.app   # override bundle id (recommended for local builds)
 #
-# Output: build/Amperfy.dmg
+# Output: build/AmperfyPlus-<version>.dmg
+#
+# Naming: display name stays "Amperfy+"; the .app / DMG use "AmperfyPlus"
+# (safer for filenames and paths than a literal +).
 #
 # Without an Apple Development certificate this uses ad-hoc signing. First launch
 # may need right-click → Open (Gatekeeper). CarPlay/Siri entitlements are omitted.
@@ -19,13 +23,15 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 SCHEME="Amperfy"
 PROJECT="${ROOT}/Amperfy.xcodeproj"
 CONFIG="${CONFIG:-Release}"
+VERSION="${VERSION:-0.1.0}"
+APP_PRODUCT_NAME="AmperfyPlus"
 BUILD_DIR="${ROOT}/build"
 DERIVED_DATA="${BUILD_DIR}/DerivedData"
-DMG_PATH="${BUILD_DIR}/Amperfy.dmg"
-VOL_NAME="Amperfy"
+DMG_PATH="${BUILD_DIR}/${APP_PRODUCT_NAME}-${VERSION}.dmg"
+VOL_NAME="AmperfyPlus ${VERSION}"
 DESTINATION="platform=macOS,variant=Mac Catalyst"
-LOCAL_ENTITLEMENTS="${BUILD_DIR}/Amperfy-local.entitlements"
-BUNDLE_ID="${BUNDLE_ID:-de.familie-zimba.amperfy-music.local}"
+LOCAL_ENTITLEMENTS="${BUILD_DIR}/AmperfyPlus-local.entitlements"
+BUNDLE_ID="${BUNDLE_ID:-de.familie-zimba.amperfyplus.local}"
 
 cd "$ROOT"
 mkdir -p "$BUILD_DIR"
@@ -44,9 +50,15 @@ cat > "$LOCAL_ENTITLEMENTS" <<'EOF'
 </plist>
 EOF
 
+# Do not override PRODUCT_NAME here — xcodebuild applies it to SPM package
+# products too and they all collide as AmperfyPlus.framework / .bundle.
+# Do not pass MARKETING_VERSION[sdk=macosx*]=… — xcodebuild mangles it into
+# CFBundleShortVersionString (e.g. "macosx*]=0.1.0").
 SIGN_ARGS=(
   CODE_SIGN_ENTITLEMENTS="$LOCAL_ENTITLEMENTS"
   PRODUCT_BUNDLE_IDENTIFIER="$BUNDLE_ID"
+  MARKETING_VERSION="$VERSION"
+  CURRENT_PROJECT_VERSION=1
   ENABLE_HARDENED_RUNTIME=NO
 )
 
@@ -70,7 +82,7 @@ else
   )
 fi
 
-echo "==> Building Mac Catalyst (${CONFIG})…"
+echo "==> Building Mac Catalyst (${CONFIG}, version ${VERSION})…"
 rm -rf "$DERIVED_DATA"
 xcodebuild \
   -project "$PROJECT" \
@@ -95,22 +107,23 @@ if [[ -z "${APP_SRC}" || ! -d "${APP_SRC}" ]]; then
   exit 1
 fi
 
-APP_NAME="$(basename "$APP_SRC")"
-echo "==> Found ${APP_NAME}"
+echo "==> Found $(basename "$APP_SRC") (version ${VERSION})"
+
+# Rename to AmperfyPlus.app only when staging the DMG (keeps Xcode target as Amperfy).
+STAGE_APP_NAME="${APP_PRODUCT_NAME}.app"
+STAGE="${BUILD_DIR}/dmg-stage"
+rm -rf "$STAGE" "$DMG_PATH"
+mkdir -p "$STAGE"
+cp -R "$APP_SRC" "$STAGE/${STAGE_APP_NAME}"
+ln -sf /Applications "$STAGE/Applications"
 
 # Ensure deep ad-hoc signature when not using a real team.
 if [[ -z "${DEVELOPMENT_TEAM:-}" ]]; then
   echo "==> Ad-hoc codesign…"
   codesign --force --deep --sign - \
     --entitlements "$LOCAL_ENTITLEMENTS" \
-    "$APP_SRC"
+    "$STAGE/${STAGE_APP_NAME}"
 fi
-
-STAGE="${BUILD_DIR}/dmg-stage"
-rm -rf "$STAGE" "$DMG_PATH"
-mkdir -p "$STAGE"
-cp -R "$APP_SRC" "$STAGE/"
-ln -sf /Applications "$STAGE/Applications"
 
 echo "==> Creating DMG…"
 hdiutil create \
@@ -125,5 +138,5 @@ rm -rf "$STAGE"
 echo "Done: ${DMG_PATH}"
 ls -lh "$DMG_PATH"
 echo
-echo "Install: open the DMG and drag Amperfy to Applications."
+echo "Install: open the DMG and drag AmperfyPlus to Applications."
 echo "If macOS blocks launch: right-click the app → Open."

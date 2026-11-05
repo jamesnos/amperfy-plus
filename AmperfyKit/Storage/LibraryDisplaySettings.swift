@@ -190,14 +190,10 @@ public struct LibraryDisplaySettings: Sendable, Codable {
       inUse: [
         .artists,
         .albums,
-        .newestAlbums,
-        .recentAlbums,
         .songs,
-        .favoriteSongs,
-        .directories,
         .playlists,
-        .podcasts,
-        .radios,
+        .genres,
+        .downloads,
       ]
     )
   }

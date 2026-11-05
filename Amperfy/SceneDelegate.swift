@@ -108,7 +108,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
       windowScene.sizeRestrictions?.minimumSize = Self.mainWindowSize
     #endif
     #if targetEnvironment(macCatalyst)
-      restoreMainWindowFrame(of: windowScene)
+      windowScene.sizeRestrictions?.minimumSize = Self.minimumWindowSize
+      // Re-apply after the window exists if this scene was reopened in-session.
+      if Self.lastClosedFrame != nil {
+        restoreMainWindowFrame(of: windowScene)
+      }
     #endif
     if let activeAccountInfo = AmperKit.shared.storage.settings.accounts.active {
       let account = appDelegate.storage.main.library.getAccount(info: activeAccountInfo)
@@ -126,6 +130,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     window?.makeKeyAndVisible()
 
+    #if targetEnvironment(macCatalyst)
+      // Must run after the NSWindow exists; willConnectTo is too early for geometry.
+      scheduleDefaultWideMainWindowIfNeeded()
+    #endif
+
     appDelegate.setAppAppearanceMode(style: appDelegate.storage.settings.user.appearanceMode)
     AmperfyAppShortcuts.updateAppShortcutParameters()
   }
@@ -137,13 +146,50 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     /// cannot restore the frame and the next main window would open in the default size.
     private static var lastClosedFrame: CGRect?
 
+    private func scheduleDefaultWideMainWindowIfNeeded() {
+      // Prefer in-session restore (Cmd+W / mini-player) over the default wide fill.
+      if let frame = Self.lastClosedFrame {
+        if let windowScene = window?.windowScene {
+          requestMainWindowFrame(frame, on: windowScene)
+        }
+        return
+      }
+
+      // Deferred so AppKit has created the NSWindow; retry once to beat state restoration.
+      DispatchQueue.main.async { [weak self] in
+        self?.applyDefaultWideMainWindowFrame()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+          self?.applyDefaultWideMainWindowFrame()
+        }
+      }
+    }
+
+    private func applyDefaultWideMainWindowFrame() {
+      guard let windowScene = window?.windowScene else { return }
+
+      // Prefer UIKit geometry update using the scene's screen size.
+      let screenBounds = windowScene.screen.bounds
+      let inset: CGFloat = 8
+      let target = screenBounds.insetBy(dx: inset, dy: inset)
+      if target.width > 0, target.height > 0 {
+        requestMainWindowFrame(target, on: windowScene)
+      }
+
+      // Also zoom the underlying NSWindow (fills visible screen on macOS).
+      MacWindowHelper.fillMainWindowToVisibleScreen()
+    }
+
     private func restoreMainWindowFrame(of windowScene: UIWindowScene) {
       guard let frame = Self.lastClosedFrame,
             frame != windowScene.effectiveGeometry.systemFrame
       else { return }
+      requestMainWindowFrame(frame, on: windowScene)
+    }
+
+    private func requestMainWindowFrame(_ frame: CGRect, on windowScene: UIWindowScene) {
       windowScene.requestGeometryUpdate(.Mac(systemFrame: frame)) { [weak self] error in
         os_log(
-          "restore window frame failed: %s",
+          "set window frame failed: %s",
           log: self?.log ?? .default,
           type: .info,
           error.localizedDescription

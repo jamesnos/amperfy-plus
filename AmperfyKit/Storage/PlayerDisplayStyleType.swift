@@ -25,7 +25,7 @@ public enum PlayerDisplayStyle: Int, Sendable, Codable {
   case compact = 0
   case large = 1
 
-  static let defaultValue: PlayerDisplayStyle = .large
+  static let defaultValue: PlayerDisplayStyle = .compact
 
   public mutating func switchToNextStyle() {
     switch self {

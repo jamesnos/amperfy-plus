@@ -59,7 +59,7 @@ struct SupportSettingsView: View {
               appDelegate.eventLogger.info(
                 topic: "Email Info",
                 statusCode: .emailError,
-                message: "Email is not configured in settings app or Amperfy is not able to send an email.",
+                message: "Email is not configured in settings app or Amperfy+ is not able to send an email.",
                 displayPopup: true
               )
             }
@@ -75,7 +75,7 @@ struct SupportSettingsView: View {
       .sheet(isPresented: $isShowingMailView) {
         MailView(
           result: $result,
-          subject: "Amperfy support",
+          subject: "Amperfy+ support",
           messageBody: """
           \nPlease describe your issue.
           \nFeedback is always welcome too.

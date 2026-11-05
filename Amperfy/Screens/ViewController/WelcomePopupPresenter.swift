@@ -54,7 +54,7 @@ class WelcomePopupPresenter: NSObject {
       let popupVC = AppStoryboard.Main.segueToLibrarySyncPopup()
       popupVC.setContent(
         topic: "Notifications",
-        detailMessage: "Amperfy can inform you about the latest podcast episodes. If you want to, please authorize Amperfy to send you notifications.",
+        detailMessage: "Amperfy+ can inform you about the latest podcast episodes. If you want to, please authorize Amperfy+ to send you notifications.",
         customIcon: .bell,
         customAnimation: .swing,
         onClosePressed: { _ in

@@ -619,7 +619,7 @@ public class IntentManager {
     documentation.append(
       XCallbackActionDocu(
         name: "SetOfflineMode",
-        description: "Sets the Amperfy offline mode to active/inactive",
+        description: "Sets the Amperfy+ offline mode to active/inactive",
         exampleURLs: [
           "amperfy://x-callback-url/setOfflineMode?offlineMode=1",
         ],
