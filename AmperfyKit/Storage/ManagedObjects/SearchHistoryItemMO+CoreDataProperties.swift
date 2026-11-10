@@ -33,6 +33,12 @@ extension SearchHistoryItemMO {
   @NSManaged
   public var date: Date?
   @NSManaged
+  public var searchedEntityId: String?
+  @NSManaged
+  public var searchedEntityName: String?
+  @NSManaged
+  public var searchedEntityType: String?
+  @NSManaged
   public var searchedLibraryEntity: AbstractLibraryEntityMO?
   @NSManaged
   public var searchedPlaylist: PlaylistMO?

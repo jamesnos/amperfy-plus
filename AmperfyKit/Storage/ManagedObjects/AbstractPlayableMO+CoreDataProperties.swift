@@ -35,7 +35,11 @@ extension AbstractPlayableMO {
   @NSManaged
   public var contentTypeTranscoded: String?
   @NSManaged
+  public var artistsText: String?
+  @NSManaged
   public var disk: String?
+  @NSManaged
+  public var displayArtist: String?
   @NSManaged
   public var path: String?
   @NSManaged

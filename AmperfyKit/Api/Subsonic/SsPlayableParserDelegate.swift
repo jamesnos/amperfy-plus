@@ -27,6 +27,9 @@ import UIKit
 class SsPlayableParserDelegate: SsXmlLibWithArtworkParser {
   var playableBuffer: AbstractPlayable?
   private var isCached = true
+  private var creditedArtistNames = [String]()
+  /// True while inside OpenSubsonic `<artists>` for the current song (not albumArtists/contributors).
+  private var isParsingSongArtists = false
   var isCollectionCached: Bool {
     parsedCount > 0 ? isCached : false
   }
@@ -53,10 +56,26 @@ class SsPlayableParserDelegate: SsXmlLibWithArtworkParser {
       playableBuffer?.replayGainTrackPeak = Float(attributeDict["trackPeak"] ?? "0.0") ?? 0.0
     }
 
+    if playableBuffer != nil, elementName == "artists" {
+      isParsingSongArtists = true
+    }
+
+    // OpenSubsonic nested song artists (only inside `<artists>`).
+    if isParsingSongArtists, elementName == "artist",
+       let name = attributeDict["name"]?.trimmingCharacters(in: .whitespacesAndNewlines),
+       !name.isEmpty {
+      if !creditedArtistNames.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) {
+        creditedArtistNames.append(name)
+      }
+    }
+
     if elementName == "song" || elementName == "entry" || elementName == "child" || elementName ==
       "episode" {
       let isDir = attributeDict["isDir"] ?? "false"
       guard let isDirBool = Bool(isDir), isDirBool == false else { return }
+
+      creditedArtistNames.removeAll(keepingCapacity: true)
+      isParsingSongArtists = false
 
       if let attributeTitle = attributeDict["title"] {
         if elementName == "episode" {
@@ -85,6 +104,10 @@ class SsPlayableParserDelegate: SsXmlLibWithArtworkParser {
       }
       if let path = attributeDict["path"], !path.isEmpty {
         playableBuffer?.path = path
+      }
+      if let displayArtist = attributeDict["displayArtist"]?
+        .trimmingCharacters(in: .whitespacesAndNewlines), !displayArtist.isEmpty {
+        playableBuffer?.displayArtist = displayArtist
       }
       if let disk = attributeDict["discNumber"] {
         playableBuffer?.disk = disk
@@ -115,6 +138,10 @@ class SsPlayableParserDelegate: SsXmlLibWithArtworkParser {
     namespaceURI: String?,
     qualifiedName qName: String?
   ) {
+    if elementName == "artists" {
+      isParsingSongArtists = false
+    }
+
     if elementName == "song" || elementName == "entry" || elementName == "child" || elementName ==
       "episode", playableBuffer != nil {
       resetPlayableBuffer()
@@ -130,8 +157,13 @@ class SsPlayableParserDelegate: SsXmlLibWithArtworkParser {
 
   func resetPlayableBuffer() {
     if let playable = playableBuffer {
+      if !creditedArtistNames.isEmpty {
+        playable.artistsText = creditedArtistNames.joined(separator: "\n")
+      }
       isCached = isCached && playable.isCached
     }
+    creditedArtistNames.removeAll(keepingCapacity: true)
+    isParsingSongArtists = false
     playableBuffer = nil
   }
 }

@@ -115,6 +115,76 @@ public class AbstractPlayable: AbstractLibraryEntity, Downloadable {
     }
   }
 
+  /// YouTube Music / Apple Music style title with `(feat. …)` when credits exist.
+  public var titleForDisplay: String {
+    let baseTitle = title
+    if Self.titleAlreadyIncludesFeat(baseTitle) {
+      return baseTitle
+    }
+    let featured = featuredArtistNamesForDisplay
+    guard !featured.isEmpty else { return baseTitle }
+    return "\(baseTitle) (feat. \(Self.joinedFeaturedArtistNames(featured)))"
+  }
+
+  private var featuredArtistNamesForDisplay: [String] {
+    let primary = creatorName.trimmingCharacters(in: .whitespacesAndNewlines)
+    var names = [String]()
+
+    if let artistsText, !artistsText.isEmpty {
+      names = artistsText
+        .split(whereSeparator: \.isNewline)
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        .filter { !$0.isEmpty }
+    } else if let displayArtist, !displayArtist.isEmpty {
+      names = Self.splitArtistList(displayArtist)
+    }
+
+    return names.filter {
+      $0.caseInsensitiveCompare(primary) != .orderedSame
+    }
+  }
+
+  private static func titleAlreadyIncludesFeat(_ title: String) -> Bool {
+    let lower = title.lowercased()
+    return lower.contains("(feat.")
+      || lower.contains("[feat.")
+      || lower.contains(" feat.")
+      || lower.contains("(ft.")
+      || lower.contains("[ft.")
+      || lower.contains(" ft.")
+  }
+
+  private static func splitArtistList(_ text: String) -> [String] {
+    let separators = CharacterSet(charactersIn: ",;&/")
+    // Also split common " feat. " / " ft. " phrases into primary + guests.
+    var working = text
+    for token in [" feat. ", " feat ", " ft. ", " ft ", " featuring "] {
+      working = working.replacingOccurrences(
+        of: token,
+        with: ",",
+        options: [.caseInsensitive]
+      )
+    }
+    return working
+      .components(separatedBy: separators)
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+  }
+
+  private static func joinedFeaturedArtistNames(_ names: [String]) -> String {
+    switch names.count {
+    case 0:
+      return ""
+    case 1:
+      return names[0]
+    case 2:
+      return "\(names[0]) & \(names[1])"
+    default:
+      let head = names.dropLast().joined(separator: ", ")
+      return "\(head) & \(names.last!)"
+    }
+  }
+
   public var track: Int {
     get { Int(playableManagedObject.track) }
     set {
@@ -281,6 +351,26 @@ public class AbstractPlayable: AbstractLibraryEntity, Downloadable {
     get { playableManagedObject.path }
     set {
       if playableManagedObject.path != newValue { playableManagedObject.path = newValue }
+    }
+  }
+
+  /// OpenSubsonic display artist string (may include all credited artists).
+  public var displayArtist: String? {
+    get { playableManagedObject.displayArtist }
+    set {
+      if playableManagedObject.displayArtist != newValue {
+        playableManagedObject.displayArtist = newValue
+      }
+    }
+  }
+
+  /// Credited artist names from OpenSubsonic `artists`, joined with newlines.
+  public var artistsText: String? {
+    get { playableManagedObject.artistsText }
+    set {
+      if playableManagedObject.artistsText != newValue {
+        playableManagedObject.artistsText = newValue
+      }
     }
   }
 

@@ -952,6 +952,8 @@ public class LibraryStorage: PlayableFileCachable {
     let fetchRequest: NSFetchRequest<SearchHistoryItemMO> = SearchHistoryItemMO.fetchRequest()
     var predicate: NSPredicate?
     var account: Account?
+    var snapshotType: SearchHistoryEntityType?
+    var snapshotId: String?
 
     if let song = container as? Song {
       predicate = NSPredicate(
@@ -960,6 +962,8 @@ public class LibraryStorage: PlayableFileCachable {
         song.managedObject
       )
       account = song.account
+      snapshotType = .song
+      snapshotId = song.id
     } else if let episode = container as? PodcastEpisode {
       predicate = NSPredicate(
         format: "%K == %@",
@@ -967,6 +971,8 @@ public class LibraryStorage: PlayableFileCachable {
         episode.managedObject
       )
       account = episode.account
+      snapshotType = .episode
+      snapshotId = episode.id
     } else if let album = container as? Album {
       predicate = NSPredicate(
         format: "%K == %@",
@@ -974,6 +980,8 @@ public class LibraryStorage: PlayableFileCachable {
         album.managedObject
       )
       account = album.account
+      snapshotType = .album
+      snapshotId = album.id
     } else if let artist = container as? Artist {
       predicate = NSPredicate(
         format: "%K == %@",
@@ -981,6 +989,8 @@ public class LibraryStorage: PlayableFileCachable {
         artist.managedObject
       )
       account = artist.account
+      snapshotType = .artist
+      snapshotId = artist.id
     } else if let podcast = container as? Podcast {
       predicate = NSPredicate(
         format: "%K == %@",
@@ -988,6 +998,8 @@ public class LibraryStorage: PlayableFileCachable {
         podcast.managedObject
       )
       account = podcast.account
+      snapshotType = .podcast
+      snapshotId = podcast.id
     } else if let playlist = container as? Playlist {
       predicate = NSPredicate(
         format: "%K == %@",
@@ -995,23 +1007,52 @@ public class LibraryStorage: PlayableFileCachable {
         playlist.managedObject
       )
       account = playlist.account
+      snapshotType = .playlist
+      snapshotId = playlist.id
     }
 
-    fetchRequest.predicate = predicate
+    // Also match an existing snapshot-only row for the same entity.
+    if let account, let snapshotType, let snapshotId, !snapshotId.isEmpty {
+      let snapshotPredicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+        getFetchPredicate(forAccount: account),
+        NSPredicate(
+          format: "%K == %@",
+          #keyPath(SearchHistoryItemMO.searchedEntityType),
+          snapshotType.rawValue
+        ),
+        NSPredicate(
+          format: "%K == %@",
+          #keyPath(SearchHistoryItemMO.searchedEntityId),
+          snapshotId
+        ),
+      ])
+      if let predicate {
+        fetchRequest.predicate = NSCompoundPredicate(orPredicateWithSubpredicates: [
+          predicate,
+          snapshotPredicate,
+        ])
+      } else {
+        fetchRequest.predicate = snapshotPredicate
+      }
+    } else {
+      fetchRequest.predicate = predicate
+    }
     fetchRequest.fetchLimit = 1
     let searchHistoryMO = try? context.fetch(fetchRequest)
     if let searchHistory = searchHistoryMO?.lazy
       .compactMap({ SearchHistoryItem(managedObject: $0) }).first {
-      // update the existing one
       searchHistory.date = Date()
+      searchHistory.searchedPlayableContainable = container
+      searchHistory.account = account
+      searchHistory.applySnapshot(from: container)
       return searchHistory
     } else {
-      // create a new item
       let itemMO = SearchHistoryItemMO(context: context)
       let item = SearchHistoryItem(managedObject: itemMO)
       item.date = Date()
       item.searchedPlayableContainable = container
       item.account = account
+      item.applySnapshot(from: container)
       return item
     }
   }
@@ -1814,8 +1855,51 @@ public class LibraryStorage: PlayableFileCachable {
       SearchHistoryItemMO.excludeEmptyItemsFetchPredicate,
     ])
     let foundHistory = try? context.fetch(fetchRequest)
-    let history = foundHistory?.compactMap { SearchHistoryItem(managedObject: $0) }
-    return history ?? [SearchHistoryItem]()
+    let history = foundHistory?.compactMap { SearchHistoryItem(managedObject: $0) } ?? [SearchHistoryItem]()
+    var didRelink = false
+    for item in history {
+      if item.searchedPlayableContainable == nil,
+         relinkSearchHistoryItem(item, for: account) {
+        didRelink = true
+      }
+    }
+    if didRelink {
+      saveContext()
+    }
+    return history
+  }
+
+  @discardableResult
+  private func relinkSearchHistoryItem(
+    _ item: SearchHistoryItem,
+    for account: Account
+  )
+    -> Bool {
+    guard let typeRaw = item.searchedEntityType,
+          let type = SearchHistoryEntityType(rawValue: typeRaw),
+          let id = item.searchedEntityId, !id.isEmpty
+    else { return false }
+
+    let container: PlayableContainable?
+    switch type {
+    case .song:
+      container = getSong(for: account, id: id)
+    case .album:
+      container = getAlbum(for: account, id: id, isDetailFaultResolution: false)
+    case .artist:
+      container = getArtist(for: account, id: id)
+    case .playlist:
+      container = getPlaylist(for: account, id: id)
+    case .podcast:
+      container = getPodcast(for: account, id: id)
+    case .episode:
+      container = getPodcastEpisode(for: account, id: id)
+    }
+    guard let container else { return false }
+    item.searchedPlayableContainable = container
+    item.account = account
+    item.applySnapshot(from: container)
+    return true
   }
 
   // MARK: ScrobbleEntries

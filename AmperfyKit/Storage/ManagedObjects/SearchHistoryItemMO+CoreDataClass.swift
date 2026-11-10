@@ -28,6 +28,18 @@ public class SearchHistoryItemMO: NSManagedObject {
     NSCompoundPredicate(orPredicateWithSubpredicates: [
       NSPredicate(format: "%K != nil", #keyPath(SearchHistoryItemMO.searchedLibraryEntity)),
       NSPredicate(format: "%K != nil", #keyPath(SearchHistoryItemMO.searchedPlaylist)),
+      NSCompoundPredicate(andPredicateWithSubpredicates: [
+        NSPredicate(
+          format: "%K != nil AND %K != ''",
+          #keyPath(SearchHistoryItemMO.searchedEntityType),
+          #keyPath(SearchHistoryItemMO.searchedEntityType)
+        ),
+        NSPredicate(
+          format: "%K != nil AND %K != ''",
+          #keyPath(SearchHistoryItemMO.searchedEntityName),
+          #keyPath(SearchHistoryItemMO.searchedEntityName)
+        ),
+      ]),
     ])
   }
 

@@ -306,7 +306,7 @@ class PlayableTableCell: BasicTableCell {
 
   func refresh() {
     guard let playable = playable else { return }
-    titleLabel.text = playable.title
+    titleLabel.text = playable.titleForDisplay
     artistLabel.text = playable.creatorName
 
     configureStyle(

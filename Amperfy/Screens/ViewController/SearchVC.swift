@@ -233,6 +233,22 @@ class SearchVC: BasicTableViewController {
       placeholder: "Search in \"Library\"",
       scopeButtonTitles: ["All", "Cached"]
     )
+    let searchText = searchController.searchBar.text ?? ""
+    if searchText.isEmpty {
+      reloadSearchHistory()
+    }
+  }
+
+  private func reloadSearchHistory() {
+    searchHistory = appDelegate.storage.main.library.getSearchHistory(for: account)
+    isSearchActive = false
+    artists = []
+    albums = []
+    playlists = []
+    songs = []
+    tableView.separatorStyle = .singleLine
+    updateDataSource(animated: false, reloadingSections: [.History])
+    updateContentUnavailable()
   }
 
   public func activateSearchBar() {
@@ -349,7 +365,14 @@ class SearchVC: BasicTableViewController {
     switch SearchSection(rawValue: indexPath.section) {
     case .History:
       let history = searchHistory[indexPath.row]
-      guard let container = history.searchedPlayableContainable else { return UITableViewCell() }
+      guard let container = history.searchedPlayableContainable else {
+        let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
+        cell.textLabel?.text = history.displayName
+        cell.textLabel?.textColor = .label
+        cell.imageView?.image = .clock
+        cell.selectionStyle = .default
+        return cell
+      }
       if let playlist = container as? Playlist {
         let cell: PlaylistTableCell = dequeueCell(for: tableView, at: indexPath)
         cell.display(playlist: playlist, rootView: self)
@@ -479,7 +502,11 @@ class SearchVC: BasicTableViewController {
     switch SearchSection(rawValue: indexPath.section) {
     case .History:
       let history = searchHistory[indexPath.row]
-      guard let container = history.searchedPlayableContainable else { break }
+      // Re-load to re-link snapshot-only items after sync brought entities back.
+      searchHistory = appDelegate.storage.main.library.getSearchHistory(for: account)
+      let refreshed = searchHistory.first { $0.managedObject.objectID == history.managedObject.objectID }
+        ?? history
+      guard let container = refreshed.searchedPlayableContainable else { break }
       let _ = appDelegate.storage.main.library.createOrUpdateSearchHistory(container: container)
       if !(container is Song) {
         EntityPreviewActionBuilder(container: container, on: self).performPreviewTransition()
@@ -684,15 +711,7 @@ class SearchVC: BasicTableViewController {
         // do nothing
       }}
     } else {
-      isSearchActive = false
-      searchHistory = appDelegate.storage.main.library.getSearchHistory(for: account)
-      artists = []
-      albums = []
-      playlists = []
-      songs = []
-      tableView.separatorStyle = .singleLine
-      updateDataSource(animated: false)
-      updateContentUnavailable()
+      reloadSearchHistory()
     }
   }
 

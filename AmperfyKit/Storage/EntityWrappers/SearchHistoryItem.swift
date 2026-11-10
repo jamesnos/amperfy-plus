@@ -21,6 +21,15 @@
 
 import Foundation
 
+public enum SearchHistoryEntityType: String {
+  case song
+  case album
+  case artist
+  case playlist
+  case podcast
+  case episode
+}
+
 public class SearchHistoryItem: NSObject {
   public let managedObject: SearchHistoryItemMO
 
@@ -44,6 +53,34 @@ public class SearchHistoryItem: NSObject {
     set { managedObject.date = newValue }
   }
 
+  public var searchedEntityType: String? {
+    get { managedObject.searchedEntityType }
+    set {
+      if managedObject.searchedEntityType != newValue {
+        managedObject.searchedEntityType = newValue
+      }
+    }
+  }
+
+  public var searchedEntityId: String? {
+    get { managedObject.searchedEntityId }
+    set {
+      if managedObject.searchedEntityId != newValue {
+        managedObject.searchedEntityId = newValue
+      }
+    }
+  }
+
+  public var searchedEntityName: String? {
+    get { managedObject.searchedEntityName }
+    set {
+      if managedObject.searchedEntityName != newValue {
+        managedObject.searchedEntityName = newValue
+      }
+    }
+  }
+
+  /// Live container when linked, otherwise nil (use `displayName` for snapshot-only rows).
   public var searchedPlayableContainable: PlayableContainable? {
     get {
       if let searchedLibraryEntityMO = managedObject.searchedLibraryEntity {
@@ -91,8 +128,50 @@ public class SearchHistoryItem: NSObject {
     }
   }
 
+  public var displayName: String {
+    if let container = searchedPlayableContainable {
+      return container.name
+    }
+    return searchedEntityName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+      ?? "Unknown"
+  }
+
+  public func applySnapshot(from container: PlayableContainable) {
+    if let song = container as? Song {
+      searchedEntityType = SearchHistoryEntityType.song.rawValue
+      searchedEntityId = song.id
+      searchedEntityName = song.name
+    } else if let episode = container as? PodcastEpisode {
+      searchedEntityType = SearchHistoryEntityType.episode.rawValue
+      searchedEntityId = episode.id
+      searchedEntityName = episode.name
+    } else if let album = container as? Album {
+      searchedEntityType = SearchHistoryEntityType.album.rawValue
+      searchedEntityId = album.id
+      searchedEntityName = album.name
+    } else if let artist = container as? Artist {
+      searchedEntityType = SearchHistoryEntityType.artist.rawValue
+      searchedEntityId = artist.id
+      searchedEntityName = artist.name
+    } else if let podcast = container as? Podcast {
+      searchedEntityType = SearchHistoryEntityType.podcast.rawValue
+      searchedEntityId = podcast.id
+      searchedEntityName = podcast.name
+    } else if let playlist = container as? Playlist {
+      searchedEntityType = SearchHistoryEntityType.playlist.rawValue
+      searchedEntityId = playlist.id
+      searchedEntityName = playlist.name
+    }
+  }
+
   override public func isEqual(_ object: Any?) -> Bool {
     guard let object = object as? SearchHistoryItem else { return false }
     return managedObject == object.managedObject
+  }
+}
+
+private extension String {
+  var nilIfEmpty: String? {
+    isEmpty ? nil : self
   }
 }
