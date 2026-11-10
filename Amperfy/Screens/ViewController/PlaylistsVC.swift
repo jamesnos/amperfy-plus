@@ -245,12 +245,7 @@ class PlaylistsVC: SingleSnapshotFetchedResultsTableViewController<PlaylistMO> {
     actions.append(createOptionsButtonMenu())
     optionsButton = UIBarButtonItem.createOptionsBarButton()
     optionsButton.menu = UIMenu(children: actions)
-    var barButtons = [UIBarButtonItem]()
-    barButtons.append(optionsButton)
-    if appDelegate.storage.settings.user.isOnlineMode {
-      barButtons.append(editButtonItem)
-    }
-    navigationItem.rightBarButtonItems = barButtons
+    navigationItem.rightBarButtonItems = [optionsButton]
   }
 
   func createCell(

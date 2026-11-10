@@ -42,9 +42,16 @@ class SideBarVC: KeyCommandCollectionViewController {
     ]
   }()
 
+  private var toolsData: [LibraryNavigatorItem] = {
+    [
+      LibraryNavigatorItem(title: "Tools", isInteractable: false),
+      LibraryNavigatorItem(title: "Playlist Generator", tab: .playlistGenerator),
+    ]
+  }()
+
   lazy var layoutConfig = UICollectionLayoutListConfiguration(appearance: .sidebar)
   lazy var libraryItemConfigurator = LibraryNavigatorConfigurator(
-    account: account, offsetData: offsetData,
+    account: account, offsetData: offsetData, toolsData: toolsData,
     librarySettings: appDelegate.storage.settings.accounts.getSetting(self.account.info)
       .read
       .libraryDisplaySettings,

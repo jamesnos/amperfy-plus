@@ -181,19 +181,7 @@ public struct SwipeActionSettings: Sendable, Codable {
   }
 
   public static var defaultSettings: SwipeActionSettings {
-    SwipeActionSettings(
-      leading: [
-        .appendContextQueue,
-        .insertContextQueue,
-
-      ], trailing: [
-        .appendUserQueue,
-        .insertUserQueue,
-        .appendPodcastQueue,
-        .insertPodcastQueue,
-        .download,
-      ]
-    )
+    SwipeActionSettings(leading: [], trailing: [])
   }
 }
 

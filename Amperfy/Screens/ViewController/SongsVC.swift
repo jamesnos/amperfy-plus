@@ -187,9 +187,7 @@ class SongsVC: SingleFetchedResultsTableViewController<SongMO> {
   func updateRightBarButtonItems() {
     var actions = [UIMenu]()
     actions.append(createSortButtonMenu())
-    if appDelegate.storage.settings.user.isOnlineMode {
-      actions.append(createActionButtonMenu())
-    }
+    actions.append(createActionButtonMenu())
     optionsButton = UIBarButtonItem.createOptionsBarButton()
     optionsButton.menu = UIMenu(children: actions)
     navigationItem.rightBarButtonItems = [optionsButton]
@@ -458,40 +456,105 @@ class SongsVC: SingleFetchedResultsTableViewController<SongMO> {
     }
   }
 
-  private func createActionButtonMenu() -> UIMenu {
-    let action = UIAction(
-      title: "Download \(filterTitle)",
-      image: UIImage.startDownload,
-      handler: { _ in
-        var songs = [Song]()
-        switch self.displayFilter {
-        case .all:
-          songs = self.appDelegate.storage.main.library.getSongs(for: self.account)
-        case .newest, .recent:
-          break
-        case .favorites:
-          songs = self.appDelegate.storage.main.library
-            .getFavoriteSongs(for: self.account)
-        }
-        if songs.count > AppDelegate.maxPlayablesDownloadsToAddAtOnceWithoutWarning {
-          let alert = UIAlertController(
-            title: "Many Songs",
-            message: "Are you sure to add \(songs.count) songs from \"\(self.filterTitle)\" to download queue?",
-            preferredStyle: .alert
-          )
-          alert.addAction(UIAlertAction(title: "OK", style: .default, handler: { _ in
-            self.appDelegate.getMeta(self.account.info).playableDownloadManager
-              .download(objects: songs)
-          }))
-          alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-          self.present(alert, animated: true, completion: nil)
-        } else {
+  private func songsForCurrentFilter() -> [Song] {
+    switch displayFilter {
+    case .all:
+      return appDelegate.storage.main.library.getSongs(for: account)
+    case .newest, .recent:
+      return []
+    case .favorites:
+      return appDelegate.storage.main.library.getFavoriteSongs(for: account)
+    }
+  }
+
+  private func createDownloadSongsAction() -> UIAction {
+    UIAction(title: "Download \(filterTitle)", image: .startDownload) { _ in
+      let songs = self.songsForCurrentFilter()
+      if songs.count > AppDelegate.maxPlayablesDownloadsToAddAtOnceWithoutWarning {
+        let alert = UIAlertController(
+          title: "Many Songs",
+          message: "Are you sure to add \(songs.count) songs from \"\(self.filterTitle)\" to download queue?",
+          preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default, handler: { _ in
           self.appDelegate.getMeta(self.account.info).playableDownloadManager
             .download(objects: songs)
-        }
+        }))
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        self.present(alert, animated: true, completion: nil)
+      } else {
+        self.appDelegate.getMeta(self.account.info).playableDownloadManager
+          .download(objects: songs)
       }
+    }
+  }
+
+  private func createDownloadSongListAction() -> UIAction {
+    UIAction(title: "Download Song List", image: .doc) { _ in
+      self.saveSongList()
+    }
+  }
+
+  private func createActionButtonMenu() -> UIMenu {
+    var actions = [UIAction]()
+    if appDelegate.storage.settings.user.isOnlineMode {
+      actions.append(createDownloadSongsAction())
+    }
+    actions.append(createDownloadSongListAction())
+    return UIMenu(options: [.displayInline], children: actions)
+  }
+
+  private func saveSongList() {
+    let lines = songsForCurrentFilter()
+      .sorted { lhs, rhs in
+        let artistOrder = lhs.creatorName.localizedStandardCompare(rhs.creatorName)
+        if artistOrder != .orderedSame { return artistOrder == .orderedAscending }
+        return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+      }
+      .map { "\($0.creatorName) - \($0.title)" }
+    let text = lines.joined(separator: "\n")
+    do {
+      let fileURL = try Self.writeSongList(text, named: filterTitle)
+      appDelegate.eventLogger.info(
+        topic: "Song List",
+        message: "Saved \(fileURL.lastPathComponent) to Downloads"
+      )
+    } catch {
+      appDelegate.eventLogger.report(topic: "Song List", error: error)
+    }
+  }
+
+  private static func writeSongList(_ text: String, named baseName: String) throws -> URL {
+    guard let downloads = FileManager.default.urls(
+      for: .downloadsDirectory,
+      in: .userDomainMask
+    ).first else {
+      throw CocoaError(.fileNoSuchFile)
+    }
+    let accessing = downloads.startAccessingSecurityScopedResource()
+    defer {
+      if accessing { downloads.stopAccessingSecurityScopedResource() }
+    }
+    try FileManager.default.createDirectory(
+      at: downloads,
+      withIntermediateDirectories: true
     )
-    return UIMenu(options: [.displayInline], children: [action])
+    let fileURL = uniqueFileURL(in: downloads, baseName: baseName)
+    let body = text.isEmpty ? text : text + "\n"
+    try body.write(to: fileURL, atomically: true, encoding: .utf8)
+    return fileURL
+  }
+
+  private static func uniqueFileURL(in directory: URL, baseName: String) -> URL {
+    let manager = FileManager.default
+    let first = directory.appendingPathComponent("\(baseName).txt")
+    if !manager.fileExists(atPath: first.path) { return first }
+    var index = 2
+    while true {
+      let candidate = directory.appendingPathComponent("\(baseName) \(index).txt")
+      if !manager.fileExists(atPath: candidate.path) { return candidate }
+      index += 1
+    }
   }
 
   @objc

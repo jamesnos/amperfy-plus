@@ -37,6 +37,8 @@ extension AbstractPlayableMO {
   @NSManaged
   public var disk: String?
   @NSManaged
+  public var path: String?
+  @NSManaged
   public var relFilePath: String?
   @NSManaged
   public var combinedDuration: Int16

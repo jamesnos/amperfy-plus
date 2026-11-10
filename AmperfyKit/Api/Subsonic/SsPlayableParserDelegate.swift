@@ -83,6 +83,9 @@ class SsPlayableParserDelegate: SsXmlLibWithArtworkParser {
       if let contentType = attributeDict["contentType"] {
         playableBuffer?.contentType = contentType
       }
+      if let path = attributeDict["path"], !path.isEmpty {
+        playableBuffer?.path = path
+      }
       if let disk = attributeDict["discNumber"] {
         playableBuffer?.disk = disk
       }

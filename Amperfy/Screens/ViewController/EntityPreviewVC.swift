@@ -123,10 +123,11 @@ class EntityPreviewActionBuilder {
     if isShowArtist {
       gotoActions.append(createShowArtistAction())
     }
-    if isShowSongDetails,
-       let song = (entityContainer as? AbstractPlayable)?.asSong,
-       let lyricsShowAction = createShowLyricsAction(song: song) {
-      gotoActions.append(lyricsShowAction)
+    if isShowSongDetails, let song = (entityContainer as? AbstractPlayable)?.asSong {
+      gotoActions.append(createTrackInfoAction(song: song))
+      if let lyricsShowAction = createShowLyricsAction(song: song) {
+        gotoActions.append(lyricsShowAction)
+      }
     }
     if isShowPodcastDetails,
        let podcastEpisode = (entityContainer as? AbstractPlayable)?.asPodcastEpisode {
@@ -172,6 +173,17 @@ class EntityPreviewActionBuilder {
     }
     if appDelegate.storage.settings.user.isShowDetailedInfo {
       menuActions.append(createCopyIdToClipboardAction())
+    }
+    if let playlist = entityContainer as? Playlist {
+      menuActions.append(UIMenu(options: .displayInline, children: [
+        createExportPlaylistAction(playlist: playlist),
+      ]))
+      if !playlist.isSmartPlaylist,
+         appDelegate.storage.settings.user.isOnlineMode {
+        menuActions.append(UIMenu(options: .displayInline, children: [
+          createDeletePlaylistAction(playlist: playlist),
+        ]))
+      }
     }
 
     return menuActions
@@ -666,6 +678,40 @@ class EntityPreviewActionBuilder {
     }
   }
 
+  private func createTrackInfoAction(song: Song) -> UIAction {
+    let isDownloaded = song.isCached
+    let action = UIAction(
+      title: "Track Info",
+      subtitle: isDownloaded ? nil : "Download the song first",
+      image: .info
+    ) { [weak self] _ in
+      self?.showTrackInfo(song: song)
+    }
+    if !isDownloaded {
+      action.attributes = .disabled
+    }
+    return action
+  }
+
+  private func showTrackInfo(song: Song) {
+    guard song.isCached,
+          let relFilePath = song.relFilePath,
+          let fileURL = CacheFileManager.shared.getAbsoluteAmperfyPath(relFilePath: relFilePath)
+    else { return }
+    let infoVC = TrackInfoVC(song: song, fileURL: fileURL)
+    let navigation = UINavigationController(rootViewController: infoVC)
+    navigation.modalPresentationStyle = .pageSheet
+    if let sheet = navigation.sheetPresentationController {
+      var detents: [UISheetPresentationController.Detent] = [.large()]
+      if rootView.traitCollection.horizontalSizeClass == .compact {
+        detents.append(.medium())
+      }
+      sheet.detents = detents
+      sheet.prefersGrabberVisible = true
+    }
+    rootView.present(navigation, animated: true)
+  }
+
   private func createShowAlbumAction() -> UIAction {
     UIAction(title: "Show Album", image: .album) { action in
       self.showAlbum()
@@ -746,6 +792,131 @@ class EntityPreviewActionBuilder {
           .download(objects: self.entityPlayables)
       }
     }
+  }
+
+  private func createExportPlaylistAction(playlist: Playlist) -> UIAction {
+    UIAction(title: "Export Playlist", image: .doc) { _ in
+      self.exportPlaylistAsM3U8(playlist)
+    }
+  }
+
+  private func exportPlaylistAsM3U8(_ playlist: Playlist) {
+    do {
+      guard let downloads = FileManager.default.urls(
+        for: .downloadsDirectory,
+        in: .userDomainMask
+      ).first else {
+        throw CocoaError(.fileNoSuchFile)
+      }
+      var entries = [(duration: Int, title: String, path: String)]()
+      for playable in playlist.playables {
+        guard let path = playable.path?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !path.isEmpty
+        else { continue }
+        entries.append((
+          duration: playable.duration,
+          title: "\(playable.creatorName) - \(playable.title)",
+          path: path
+        ))
+      }
+      guard !entries.isEmpty else {
+        appDelegate.eventLogger.info(
+          topic: "Export Playlist",
+          message: "No server paths available. Sync the playlist songs, then try again."
+        )
+        return
+      }
+
+      let accessing = downloads.startAccessingSecurityScopedResource()
+      defer {
+        if accessing { downloads.stopAccessingSecurityScopedResource() }
+      }
+      try FileManager.default.createDirectory(
+        at: downloads,
+        withIntermediateDirectories: true
+      )
+      let baseName = Self.sanitizedPlaylistFileName(playlist.name)
+      let fileURL = Self.uniqueDownloadFileURL(
+        in: downloads,
+        baseName: baseName,
+        pathExtension: "m3u8"
+      )
+      var lines = ["#EXTM3U"]
+      for entry in entries {
+        lines.append("#EXTINF:\(entry.duration),\(entry.title)")
+        lines.append(entry.path)
+      }
+      try (lines.joined(separator: "\n") + "\n").write(
+        to: fileURL,
+        atomically: true,
+        encoding: .utf8
+      )
+      appDelegate.eventLogger.info(
+        topic: "Export Playlist",
+        message: "Saved \(fileURL.lastPathComponent) to Downloads"
+      )
+    } catch {
+      appDelegate.eventLogger.report(topic: "Export Playlist", error: error)
+    }
+  }
+
+  private static func sanitizedPlaylistFileName(_ name: String) -> String {
+    let invalid = CharacterSet(charactersIn: "/\\:?%*|\"<>")
+    let cleaned = name
+      .components(separatedBy: invalid)
+      .joined(separator: "-")
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    return cleaned.isEmpty ? "Playlist" : cleaned
+  }
+
+  private static func uniqueDownloadFileURL(
+    in directory: URL,
+    baseName: String,
+    pathExtension: String
+  ) -> URL {
+    let manager = FileManager.default
+    let first = directory.appendingPathComponent("\(baseName).\(pathExtension)")
+    if !manager.fileExists(atPath: first.path) { return first }
+    var index = 2
+    while true {
+      let candidate = directory.appendingPathComponent("\(baseName) \(index).\(pathExtension)")
+      if !manager.fileExists(atPath: candidate.path) { return candidate }
+      index += 1
+    }
+  }
+
+  private func createDeletePlaylistAction(playlist: Playlist) -> UIAction {
+    UIAction(title: "Delete Playlist", image: .trash, attributes: .destructive) { _ in
+      let alert = UIAlertController(
+        title: nil,
+        message: "Are you sure you want to delete this playlist?",
+        preferredStyle: .alert
+      )
+      alert.addAction(UIAlertAction(title: "Delete", style: .destructive, handler: { _ in
+        self.deletePlaylist(playlist)
+      }))
+      alert.addAction(UIAlertAction(title: "Cancel", style: .cancel, handler: { _ in
+        // do nothing
+      }))
+      self.rootView.present(alert, animated: true, completion: nil)
+    }
+  }
+
+  private func deletePlaylist(_ playlist: Playlist) {
+    let playlistId = playlist.id
+    guard let account = playlist.account else { return }
+    appDelegate.storage.main.library.deletePlaylist(playlist)
+    appDelegate.storage.main.saveContext()
+    if rootView is PlaylistDetailVC {
+      rootView.navigationController?.popViewController(animated: true)
+    }
+    guard !playlistId.isEmpty else { return }
+    Task { @MainActor in do {
+      try await self.appDelegate.getMeta(account.info).librarySyncer
+        .syncUpload(playlistIdToDelete: playlistId)
+    } catch {
+      self.appDelegate.eventLogger.report(topic: "Playlist Upload Deletion", error: error)
+    }}
   }
 
   private func createDeleteCacheAction() -> UIAction {

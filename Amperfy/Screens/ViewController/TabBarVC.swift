@@ -276,6 +276,8 @@ extension TabBarVC: MainSceneHostingViewController {
       selectedTab = homeTab
     case .search:
       selectedTab = searchTab
+    case .playlistGenerator:
+      push(vc: tabCategory.getController(account: account))
     }
     configureTraitChangesForMiniPlayer()
   }

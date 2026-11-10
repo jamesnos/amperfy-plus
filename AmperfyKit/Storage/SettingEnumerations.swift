@@ -31,7 +31,7 @@ public enum ArtworkDownloadSetting: Int, CaseIterable, Sendable, Codable {
   case onlyOnce = 1
   case never = 2
 
-  static let defaultValue: ArtworkDownloadSetting = .onlyOnce
+  static let defaultValue: ArtworkDownloadSetting = .updateOncePerSession
 
   public var description: String {
     switch self {
@@ -53,7 +53,7 @@ public enum ArtworkDisplayPreference: Int, CaseIterable, Sendable, Codable {
   case preferServerArtwork = 2
   case preferId3Tag = 3
 
-  public static let defaultValue: ArtworkDisplayPreference = .preferId3Tag
+  public static let defaultValue: ArtworkDisplayPreference = .serverArtworkOnly
 
   public var description: String {
     switch self {

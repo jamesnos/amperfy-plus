@@ -276,6 +276,14 @@ public class AbstractPlayable: AbstractLibraryEntity, Downloadable {
     }
   }
 
+  /// Server-relative library path (Subsonic/Navidrome `path`, Ampache `filename` when available).
+  public var path: String? {
+    get { playableManagedObject.path }
+    set {
+      if playableManagedObject.path != newValue { playableManagedObject.path = newValue }
+    }
+  }
+
   public var isCached: Bool {
     relFilePath != nil
   }

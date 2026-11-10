@@ -6,7 +6,7 @@
 #
 # Optional env:
 #   CONFIG=Release              # default Release
-#   VERSION=0.1.0               # marketing version stamped into the app + DMG name
+#   VERSION=0.2.0               # marketing version stamped into the app + DMG name
 #   DEVELOPMENT_TEAM=XXXXXXXX   # if you have an Apple Development cert, use it
 #   BUNDLE_ID=com.example.app   # override bundle id (recommended for local builds)
 #
@@ -23,7 +23,7 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 SCHEME="Amperfy"
 PROJECT="${ROOT}/Amperfy.xcodeproj"
 CONFIG="${CONFIG:-Release}"
-VERSION="${VERSION:-0.1.0}"
+VERSION="${VERSION:-0.2.0}"
 APP_PRODUCT_NAME="AmperfyPlus"
 BUILD_DIR="${ROOT}/build"
 DERIVED_DATA="${BUILD_DIR}/DerivedData"
@@ -43,6 +43,8 @@ cat > "$LOCAL_ENTITLEMENTS" <<'EOF'
 <plist version="1.0">
 <dict>
 	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.files.downloads.read-write</key>
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>

@@ -166,7 +166,7 @@ public struct UserSettings: Sendable, Codable {
     set { _isPlaybackStartOnlyOnPlay = newValue }
   }
 
-  private var _isPlayerSongPlaybackResumeEnabled: Bool = true
+  private var _isPlayerSongPlaybackResumeEnabled: Bool = false
   public var isPlayerSongPlaybackResumeEnabled: Bool {
     get { _isPlayerSongPlaybackResumeEnabled }
     set { _isPlayerSongPlaybackResumeEnabled = newValue }
@@ -412,10 +412,10 @@ public struct AccountSettings: Sendable, Codable {
 
   public mutating func login(_ loginCredentials: LoginCredentials) {
     let accountInfo = Account.createInfo(credentials: loginCredentials)
-    let newTheme = themeColorForNextNewAccount
+    // Theme is not overwritten here: new accounts get AccountSetting's default
+    // (ThemePreference.defaultValue / red); existing accounts keep their theme.
     updateSetting(accountInfo) { accountSettings in
       accountSettings.loginCredentials = loginCredentials
-      accountSettings.themePreference = newTheme
     }
     _activeAccount = accountInfo
   }
@@ -473,21 +473,6 @@ public struct AccountSettings: Sendable, Codable {
         return cred0.username < cred1.username
       }
     })
-  }
-
-  private var themeColorForNextNewAccount: ThemePreference {
-    var theme = ThemePreference.defaultValue
-    let usedThemes = Set(_accounts.compactMap { $0.value.themePreference })
-    let allThemes = Set(ThemePreference.allCases)
-    let availableThemes = allThemes.subtracting(usedThemes)
-    if let firstAvailable = availableThemes.sorted(by: { $0.rawValue < $1.rawValue }).first {
-      theme = firstAvailable
-    } else if let activeAccount = _activeAccount {
-      let activeTheme = getSetting(activeAccount).read.themePreference
-      theme = allThemes.subtracting(Set([activeTheme])).sorted(by: { $0.rawValue < $1.rawValue })
-        .first ?? .defaultValue
-    }
-    return theme
   }
 }
 

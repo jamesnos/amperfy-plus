@@ -719,6 +719,71 @@ public class LibraryStorage: PlayableFileCachable {
     }
   }
 
+  /// Scans the local song/episode cache folders and reattaches files to matching library
+  /// playables. Also ensures each matched playable has a finished Download row so the
+  /// Downloads tab can list them again after a restart.
+  @discardableResult
+  public func reattachLocalPlayableCache(for account: Account) -> Int {
+    let accountInfo = account.info
+    let cachedSongs = fileManager.getCachedSongs(for: accountInfo)
+    let cachedEpisodes = fileManager.getCachedEpisodes(for: accountInfo)
+    guard !cachedSongs.isEmpty || !cachedEpisodes.isEmpty else { return 0 }
+
+    var restoredCount = 0
+    for cached in cachedSongs {
+      guard let song = getSong(for: account, id: cached.id) else { continue }
+      ensureLocalCacheAttached(playable: song, cache: cached)
+      ensureFinishedDownload(for: song, account: account)
+      restoredCount += 1
+    }
+    for cached in cachedEpisodes {
+      guard let episode = getPodcastEpisode(for: account, id: cached.id) else { continue }
+      ensureLocalCacheAttached(playable: episode, cache: cached)
+      ensureFinishedDownload(for: episode, account: account)
+      restoredCount += 1
+    }
+    if restoredCount > 0 {
+      saveContext()
+    }
+    return restoredCount
+  }
+
+  private func ensureLocalCacheAttached(
+    playable: AbstractPlayable,
+    cache: CacheFileManager.PlayableCacheInfo
+  ) {
+    if let relFilePath = cache.relFilePath {
+      playable.relFilePath = relFilePath
+    }
+    if let mimeType = cache.mimeType {
+      playable.contentTypeTranscoded = mimeType
+    }
+  }
+
+  private func ensureFinishedDownload(for playable: AbstractPlayable, account: Account) {
+    let download: Download
+    if let existingMO = playable.playableManagedObject.download {
+      download = Download(managedObject: existingMO)
+    } else if let existing = getDownload(account: account, id: playable.uniqueID) {
+      download = existing
+      download.element = playable
+    } else {
+      download = createDownload(account: account, id: playable.uniqueID)
+      download.element = playable
+    }
+    if download.creationDate == nil {
+      download.creationDate = Date()
+    }
+    download.error = nil
+    download.progress = 1.0
+    if download.startDate == nil {
+      download.startDate = download.creationDate
+    }
+    if download.finishDate == nil {
+      download.finishDate = Date()
+    }
+  }
+
   public func deleteRemoteArtworkCachePaths(account: Account) {
     let fetchRequest = ArtworkMO.fetchRequest()
     fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [

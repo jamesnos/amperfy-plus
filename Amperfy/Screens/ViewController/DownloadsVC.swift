@@ -29,6 +29,8 @@ class DownloadsVC: SingleFetchedResultsTableViewController<DownloadMO> {
   private var fetchedResultsController: DownloadsFetchedResultsController!
   private var optionsButton: UIBarButtonItem!
   private var downloadManager: DownloadManageable!
+  private let spinner = UIActivityIndicatorView(style: .medium)
+  private var isRestoringLocalCache = false
 
   init(account: Account) {
     super.init(style: .plain, account: account)
@@ -60,6 +62,14 @@ class DownloadsVC: SingleFetchedResultsTableViewController<DownloadMO> {
     optionsButton = UIBarButtonItem.createOptionsBarButton()
     optionsButton.menu = createActionButtonMenu()
     navigationItem.rightBarButtonItem = optionsButton
+
+    spinner.translatesAutoresizingMaskIntoConstraints = false
+    spinner.hidesWhenStopped = true
+    view.addSubview(spinner)
+    NSLayoutConstraint.activate([
+      spinner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+      spinner.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+    ])
   }
 
   private func createActionButtonMenu() -> UIMenu {
@@ -84,11 +94,46 @@ class DownloadsVC: SingleFetchedResultsTableViewController<DownloadMO> {
         self.downloadManager.cancelDownloads()
       }
     )
+    let deleteAllCacheAction = UIAction(
+      title: "Delete All",
+      image: UIImage.trash,
+      attributes: .destructive,
+      handler: { _ in
+        self.confirmDeleteAllCache()
+      }
+    )
     return UIMenu(children: [
       clearFinishedDownloadsAction,
       retryFailedDownloadsAction,
       cancelAllDownloadsAction,
+      deleteAllCacheAction,
     ])
+  }
+
+  private func confirmDeleteAllCache() {
+    let alert = UIAlertController(
+      title: "Delete All",
+      message: "Are you sure you want to delete all downloaded songs and podcast episodes from the cache?",
+      preferredStyle: .alert
+    )
+    alert.addAction(UIAlertAction(title: "Delete", style: .destructive, handler: { _ in
+      self.deleteAllCache()
+    }))
+    alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+    present(alert, animated: true)
+  }
+
+  private func deleteAllCache() {
+    appDelegate.player.stop()
+    downloadManager.stop()
+    downloadManager.cancelDownloads()
+    appDelegate.storage.main.library.deletePlayableCachePaths(for: account)
+    appDelegate.storage.main.library.saveContext()
+    CacheFileManager.shared.deletePlayableCache(accountInfo: account.info)
+    downloadManager.clearFinishedDownloads()
+    downloadManager.start()
+    fetchedResultsController.fetch()
+    tableView.reloadData()
   }
 
   override func viewWillAppear(_ animated: Bool) {
@@ -99,8 +144,32 @@ class DownloadsVC: SingleFetchedResultsTableViewController<DownloadMO> {
   override func viewIsAppearing(_ animated: Bool) {
     super.viewIsAppearing(animated)
     extendSafeAreaToAccountForMiniPlayer()
-    fetchedResultsController.fetch()
-    tableView.reloadData()
+    restoreLocalCacheIfNeeded()
+  }
+
+  private func restoreLocalCacheIfNeeded() {
+    guard !isRestoringLocalCache else { return }
+    isRestoringLocalCache = true
+    spinner.startAnimating()
+    tableView.isUserInteractionEnabled = false
+    let accountObjectId = account.managedObject.objectID
+    Task { @MainActor in
+      defer {
+        self.isRestoringLocalCache = false
+        self.spinner.stopAnimating()
+        self.tableView.isUserInteractionEnabled = true
+      }
+      do {
+        try await self.appDelegate.storage.async.perform { asyncCompanion in
+          let accountAsync = asyncCompanion.library.getAccount(managedObjectId: accountObjectId)
+          asyncCompanion.library.reattachLocalPlayableCache(for: accountAsync)
+        }
+      } catch {
+        self.appDelegate.eventLogger.report(topic: "Restore Local Cache", error: error)
+      }
+      self.fetchedResultsController.fetch()
+      self.tableView.reloadData()
+    }
   }
 
   func convertCellViewToPlayContext(cell: UITableViewCell) -> PlayContext? {

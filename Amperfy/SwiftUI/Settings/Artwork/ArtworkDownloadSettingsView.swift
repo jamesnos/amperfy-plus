@@ -28,7 +28,7 @@ struct ArtworkDownloadSettingsView: View {
   @State
   var settingOptions = [ArtworkDownloadSetting]()
   @State
-  var activeOption = ArtworkDownloadSetting.onlyOnce
+  var activeOption = ArtworkDownloadSetting.updateOncePerSession
   @EnvironmentObject
   var settings: Settings
 

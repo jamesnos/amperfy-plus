@@ -20,6 +20,7 @@
 //
 
 import AmperfyKit
+import SwiftUI
 import UIKit
 
 // MARK: - LibraryNavigatorItem
@@ -61,11 +62,13 @@ final class LibraryNavigatorItem: Hashable, Sendable {
 enum TabNavigatorItem: Int, Hashable, CaseIterable {
   case search
   case home
+  case playlistGenerator
 
   var title: String {
     switch self {
     case .home: return "Home"
     case .search: return "Search"
+    case .playlistGenerator: return "Playlist Generator"
     }
   }
 
@@ -74,6 +77,7 @@ enum TabNavigatorItem: Int, Hashable, CaseIterable {
     switch self {
     case .home: return .home
     case .search: return .search
+    case .playlistGenerator: return .playlistPlus
     }
   }
 
@@ -82,6 +86,8 @@ enum TabNavigatorItem: Int, Hashable, CaseIterable {
     switch self {
     case .home: return AppStoryboard.Main.segueToHome(account: account)
     case .search: return AppStoryboard.Main.segueToSearch(account: account)
+    case .playlistGenerator:
+      return PlaylistGeneratorHostVC(account: account)
     }
   }
 }
@@ -96,6 +102,7 @@ class LibraryNavigatorConfigurator: NSObject {
 
   private let account: Account
   private let offsetData: [LibraryNavigatorItem]
+  private let toolsData: [LibraryNavigatorItem]
   private var collectionView: UICollectionView!
   private var dataSource: SideBarDiffableDataSource!
   private let layoutConfig: UICollectionLayoutListConfiguration
@@ -114,12 +121,14 @@ class LibraryNavigatorConfigurator: NSObject {
   init(
     account: Account,
     offsetData: [LibraryNavigatorItem],
+    toolsData: [LibraryNavigatorItem] = [],
     librarySettings: LibraryDisplaySettings,
     layoutConfig: UICollectionLayoutListConfiguration,
     pressedOnLibraryItemCB: @escaping (@MainActor (_: LibraryNavigatorItem) -> ())
   ) {
     self.account = account
     self.offsetData = offsetData
+    self.toolsData = toolsData
     self.libraryItems = Dictionary(uniqueKeysWithValues: LibraryDisplayType.allCases.map {
       ($0, LibraryNavigatorItem(title: $0.displayName, library: $0))
     })
@@ -248,6 +257,7 @@ class LibraryNavigatorConfigurator: NSObject {
     var snapshot = NSDiffableDataSourceSectionSnapshot<LibraryNavigatorItem>()
     snapshot.append(offsetData)
     snapshot.append(collectionView.isEditing ? editor.items : editor.orderedCheckedItems)
+    snapshot.append(toolsData)
     dataSource.apply(snapshot, to: 0, animatingDifferences: animated)
   }
 
@@ -373,7 +383,8 @@ extension LibraryNavigatorConfigurator: UICollectionViewDelegate {
   )
     -> Bool {
     if collectionView.isEditing {
-      return indexPath.row >= offsetData.count
+      guard let item = dataSource.itemIdentifier(for: indexPath) else { return false }
+      return editor.items.contains(item)
     } else if let item = dataSource.itemIdentifier(for: indexPath) {
       return item.isInteractable
     } else {

@@ -126,9 +126,14 @@ extension AppDelegate: AlertDisplayable {
     let banner = FloatingNotificationBanner(
       title: title,
       subtitle: subtitle,
+      titleFont: .systemFont(ofSize: 15, weight: .semibold),
+      titleColor: .white,
+      subtitleFont: .systemFont(ofSize: 13),
+      subtitleColor: .white,
       style: BannerStyle.from(logType: style),
       colors: AmperfyBannerColors()
     )
+    banner.transparency = 1
 
     banner.onTap = {
       guard let topView = Self.topViewController(),
@@ -137,29 +142,74 @@ extension AppDelegate: AlertDisplayable {
       topView.present(popupVC, animated: true, completion: nil)
     }
 
-    if UIDevice.current.userInterfaceIdiom == .pad {
-      banner.bannerHeight = 80
-    } else if UIDevice.current.userInterfaceIdiom == .phone {
-      banner.bannerHeight = 180
-    } else { // mac
-      banner.bannerHeight = 140
-    }
-
+    // Pin a compact toast to the top-right on Mac / iPad; phones stay near full width.
+    // Measure the text at that width. The banner otherwise sizes itself for the full window,
+    // and the message draws outside the colored fill.
+    let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+    let horizontalPadding: CGFloat = 16
+    let hostWidth = topView.view.bounds.width > 1
+      ? topView.view.bounds.width
+      : (UIApplication.shared.mainWindow?.bounds.width ?? 800)
+    let preferredWidth = isPhone ? hostWidth - (horizontalPadding * 2) : 440
+    let titleFont = UIFont.systemFont(ofSize: 15, weight: .semibold)
+    let subtitleFont = UIFont.systemFont(ofSize: 13)
+    banner.bannerHeight = fittedBannerHeight(
+      title: title,
+      subtitle: subtitle,
+      titleFont: titleFont,
+      subtitleFont: subtitleFont,
+      width: preferredWidth
+    )
+    let leftInset = max(horizontalPadding, hostWidth - preferredWidth - horizontalPadding)
     let topViewInset = UIEdgeInsets(
-      top: 40,
-      left: 24,
-      bottom: 24,
-      right: 24
+      top: isPhone ? 40 : 16,
+      left: leftInset,
+      bottom: 16,
+      right: horizontalPadding
     )
     banner.show(
       queuePosition: QueuePosition.back,
       bannerPosition: BannerPosition.top,
       on: topView,
       edgeInsets: topViewInset,
-      cornerRadius: 10,
+      cornerRadius: 16,
       shadowOpacity: 0.5,
       shadowBlurRadius: 5
     )
+  }
+
+  private func fittedBannerHeight(
+    title: String,
+    subtitle: String,
+    titleFont: UIFont,
+    subtitleFont: UIFont,
+    width: CGFloat
+  ) -> CGFloat {
+    let textWidth = max(160, width - 40)
+    func measured(_ text: String, font: UIFont) -> CGFloat {
+      guard !text.isEmpty else { return 0 }
+      let rect = (text as NSString).boundingRect(
+        with: CGSize(width: textWidth, height: .greatestFiniteMagnitude),
+        options: [.usesLineFragmentOrigin, .usesFontLeading],
+        attributes: [.font: font],
+        context: nil
+      )
+      return ceil(rect.height)
+    }
+    let titleHeight = measured(title, font: titleFont)
+    let subtitleHeight = measured(subtitle, font: subtitleFont)
+    var textBlock = titleHeight + subtitleHeight
+    if titleHeight > 0, subtitleHeight > 0 {
+      textBlock += 8
+    }
+    // The banner keeps a clear spacer inside its frame (the status bar height on
+    // Mac), so the colored pill is shorter than the frame. Add that back, plus
+    // enough padding that both lines sit inside the fill.
+    let spacerInsideFrame = UIDevice.current.userInterfaceIdiom == .phone
+      ? 0
+      : UIApplication.shared.statusBarFrame.height
+    let contentHeight = max(textBlock + 48, 104)
+    return contentHeight + spacerInsideFrame
   }
 
   func display(popup popupVC: UIViewController) {

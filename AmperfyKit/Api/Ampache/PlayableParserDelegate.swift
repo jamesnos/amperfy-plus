@@ -75,6 +75,10 @@ class PlayableParserDelegate: AmpacheXmlLibParser {
       playableBuffer?.track = Int(buffer) ?? 0
     case "url":
       playableBuffer?.url = buffer
+    case "filename":
+      if !buffer.isEmpty {
+        playableBuffer?.path = buffer
+      }
     case "year":
       playableBuffer?.year = Int(buffer) ?? 0
     case "time":

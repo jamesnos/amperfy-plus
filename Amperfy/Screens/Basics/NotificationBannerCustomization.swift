@@ -29,11 +29,18 @@ class AmperfyBannerColors: BannerColorsProtocol {
   internal func color(for style: BannerStyle) -> UIColor {
     switch style {
     case .danger: return .red
-    case .info: return .defaultBlue
-    case .customView: return .defaultBlue
+    case .customView, .info: return Self.themeColor
     case .success: return .green
     case .warning: return .yellow
     }
+  }
+
+  /// Matches the active account's Display theme (sidebar / tint).
+  private static var themeColor: UIColor {
+    guard let appDelegate = UIApplication.shared.delegate as? AppDelegate,
+          let active = appDelegate.storage.settings.accounts.active
+    else { return ThemePreference.defaultValue.asColor }
+    return appDelegate.storage.settings.accounts.getSetting(active).read.themePreference.asColor
   }
 }
 

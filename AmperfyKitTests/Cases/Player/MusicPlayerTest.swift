@@ -170,6 +170,7 @@ final class MOCK_LibrarySyncer: LibrarySyncer {
   func searchArtists(searchText: String) async throws {}
   func searchAlbums(searchText: String) async throws {}
   func searchSongs(searchText: String) async throws {}
+  func searchSongMatches(searchText: String) async throws -> [NSManagedObjectID] { [] }
   func syncMusicFolders() async throws {}
   func syncIndexes(musicFolder: MusicFolder) async throws {}
   func sync(directory: Directory) async throws {}

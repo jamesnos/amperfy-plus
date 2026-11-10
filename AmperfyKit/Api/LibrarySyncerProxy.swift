@@ -19,6 +19,7 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
 
+import CoreData
 import Foundation
 
 // MARK: - LibrarySyncerProxy
@@ -152,6 +153,11 @@ extension LibrarySyncerProxy: LibrarySyncer {
   @MainActor
   func searchSongs(searchText: String) async throws {
     try await activeSyncer.searchSongs(searchText: searchText)
+  }
+
+  @MainActor
+  func searchSongMatches(searchText: String) async throws -> [NSManagedObjectID] {
+    try await activeSyncer.searchSongMatches(searchText: searchText)
   }
 
   @MainActor

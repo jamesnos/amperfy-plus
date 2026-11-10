@@ -179,6 +179,10 @@ public protocol LibrarySyncer: Sendable {
   func searchAlbums(searchText: String) async throws
   @MainActor
   func searchSongs(searchText: String) async throws
+  /// Live song search. Returns the songs the server just returned (permanent object IDs),
+  /// not a local title-contains filter of the query string.
+  @MainActor
+  func searchSongMatches(searchText: String) async throws -> [NSManagedObjectID]
   @MainActor
   func syncMusicFolders() async throws
   @MainActor

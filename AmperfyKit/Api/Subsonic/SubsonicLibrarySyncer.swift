@@ -1284,10 +1284,15 @@ class SubsonicLibrarySyncer: CommonLibrarySyncer, LibrarySyncer {
 
   @MainActor
   func searchSongs(searchText: String) async throws {
-    guard isSyncAllowed, !searchText.isEmpty else { return }
+    _ = try await searchSongMatches(searchText: searchText)
+  }
+
+  @MainActor
+  func searchSongMatches(searchText: String) async throws -> [NSManagedObjectID] {
+    guard isSyncAllowed, !searchText.isEmpty else { return [] }
     os_log("Search songs via API: \"%s\"", log: log, type: .info, searchText)
     let response = try await subsonicServerApi.requestSearchSongs(searchText: searchText)
-    try await storage.async.perform { asyncCompanion in
+    return try await storage.async.performAndGet { asyncCompanion in
       let accountAsync = asyncCompanion.library.getAccount(managedObjectId: self.accountObjectId)
       let idParserDelegate = SsIDsParserDelegate(performanceMonitor: self.performanceMonitor)
       try self.parse(
@@ -1305,6 +1310,7 @@ class SubsonicLibrarySyncer: CommonLibrarySyncer, LibrarySyncer {
         library: asyncCompanion.library
       )
       try self.parse(response: response, delegate: parserDelegate)
+      return try asyncCompanion.getPermanentObjectIDs(of: parserDelegate.parsedSongs)
     }
   }
 
