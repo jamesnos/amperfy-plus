@@ -30,6 +30,7 @@ public enum SearchSection: Int, CaseIterable {
   case Artist
   case Album
   case Playlist
+  case Featured
   case Song
 }
 
@@ -56,6 +57,8 @@ class SearchDiffableDataSource: BasicUITableViewDiffableDataSource {
       return "Artists"
     case .Album:
       return "Albums"
+    case .Featured:
+      return "Featured"
     case .Song:
       return "Songs"
     case .none:
@@ -69,14 +72,28 @@ class SearchDiffableDataSource: BasicUITableViewDiffableDataSource {
 class SearchVC: BasicTableViewController {
   override var sceneTitle: String { "Search" }
 
-  nonisolated private static let categoryItemLimit = 10
+  nonisolated private static let categoryPageSize = 10
+  nonisolated private static let categoryResultCap = 100
 
   private var diffableDataSource: SearchDiffableDataSource?
   fileprivate var searchHistory: [SearchHistoryItem] = []
   fileprivate var artists: [Artist] = []
   fileprivate var albums: [Album] = []
   fileprivate var playlists: [Playlist] = []
+  fileprivate var featuredSongs: [Song] = []
   fileprivate var songs: [Song] = []
+
+  private var allArtistsIDs: [NSManagedObjectID] = []
+  private var allAlbumsIDs: [NSManagedObjectID] = []
+  private var allPlaylistsIDs: [NSManagedObjectID] = []
+  private var allFeaturedSongsIDs: [NSManagedObjectID] = []
+  private var allSongsIDs: [NSManagedObjectID] = []
+
+  private var artistsVisibleCount = SearchVC.categoryPageSize
+  private var albumsVisibleCount = SearchVC.categoryPageSize
+  private var playlistsVisibleCount = SearchVC.categoryPageSize
+  private var featuredVisibleCount = SearchVC.categoryPageSize
+  private var songsVisibleCount = SearchVC.categoryPageSize
 
   private var userButton: UIButton?
   private var userBarButtonItem: UIBarButtonItem?
@@ -133,6 +150,10 @@ class SearchVC: BasicTableViewController {
       toSection: SearchSection.Playlist.rawValue
     )
     snapshot.appendItems(
+      featuredSongs.compactMap { $0.managedObject.objectID },
+      toSection: SearchSection.Featured.rawValue
+    )
+    snapshot.appendItems(
       songs.compactMap { $0.managedObject.objectID },
       toSection: SearchSection.Song.rawValue
     )
@@ -159,7 +180,7 @@ class SearchVC: BasicTableViewController {
     tableView.sectionHeaderHeight = 0.0
     tableView.estimatedSectionHeaderHeight = 0.0
     tableView.sectionFooterHeight = 0.0
-    tableView.estimatedSectionFooterHeight = 0.0
+    tableView.estimatedSectionFooterHeight = CommonScreenOperations.tableSectionHeightLarge
     tableView.sectionHeaderTopPadding = 0.0
 
     containableAtIndexPathCallback = { indexPath in
@@ -172,6 +193,8 @@ class SearchVC: BasicTableViewController {
         return self.artists[indexPath.row]
       case .Album:
         return self.albums[indexPath.row]
+      case .Featured:
+        return self.featuredSongs[indexPath.row]
       case .Song:
         return self.songs[indexPath.row]
       case .none:
@@ -192,6 +215,9 @@ class SearchVC: BasicTableViewController {
         return PlayContext(containable: entity)
       case .Album:
         let entity = self.albums[indexPath.row]
+        return PlayContext(containable: entity)
+      case .Featured:
+        let entity = self.featuredSongs[indexPath.row]
         return PlayContext(containable: entity)
       case .Song:
         let entity = self.songs[indexPath.row]
@@ -242,13 +268,106 @@ class SearchVC: BasicTableViewController {
   private func reloadSearchHistory() {
     searchHistory = appDelegate.storage.main.library.getSearchHistory(for: account)
     isSearchActive = false
-    artists = []
-    albums = []
-    playlists = []
-    songs = []
+    clearRankedSearchResults()
     tableView.separatorStyle = .singleLine
     updateDataSource(animated: false, reloadingSections: [.History])
     updateContentUnavailable()
+  }
+
+  private func resetPaginationVisibleCounts() {
+    artistsVisibleCount = Self.categoryPageSize
+    albumsVisibleCount = Self.categoryPageSize
+    playlistsVisibleCount = Self.categoryPageSize
+    featuredVisibleCount = Self.categoryPageSize
+    songsVisibleCount = Self.categoryPageSize
+  }
+
+  private func clearRankedSearchResults() {
+    allArtistsIDs = []
+    allAlbumsIDs = []
+    allPlaylistsIDs = []
+    allFeaturedSongsIDs = []
+    allSongsIDs = []
+    artists = []
+    albums = []
+    playlists = []
+    featuredSongs = []
+    songs = []
+    resetPaginationVisibleCounts()
+  }
+
+  private func resolveDisplayedResults() {
+    artists = allArtistsIDs
+      .prefix(artistsVisibleCount)
+      .compactMap { appDelegate.storage.main.context.object(with: $0) as? ArtistMO }
+      .compactMap { Artist(managedObject: $0) }
+    albums = allAlbumsIDs
+      .prefix(albumsVisibleCount)
+      .compactMap { appDelegate.storage.main.context.object(with: $0) as? AlbumMO }
+      .compactMap { Album(managedObject: $0) }
+    playlists = allPlaylistsIDs
+      .prefix(playlistsVisibleCount)
+      .compactMap { appDelegate.storage.main.context.object(with: $0) as? PlaylistMO }
+      .compactMap { Playlist(library: appDelegate.storage.main.library, managedObject: $0) }
+    featuredSongs = allFeaturedSongsIDs
+      .prefix(featuredVisibleCount)
+      .compactMap { appDelegate.storage.main.context.object(with: $0) as? SongMO }
+      .compactMap { Song(managedObject: $0) }
+    songs = allSongsIDs
+      .prefix(songsVisibleCount)
+      .compactMap { appDelegate.storage.main.context.object(with: $0) as? SongMO }
+      .compactMap { Song(managedObject: $0) }
+  }
+
+  private func sectionHasMoreResults(_ section: SearchSection) -> Bool {
+    switch section {
+    case .Artist:
+      return allArtistsIDs.count > artistsVisibleCount
+    case .Album:
+      return allAlbumsIDs.count > albumsVisibleCount
+    case .Playlist:
+      return allPlaylistsIDs.count > playlistsVisibleCount
+    case .Featured:
+      return allFeaturedSongsIDs.count > featuredVisibleCount
+    case .Song:
+      return allSongsIDs.count > songsVisibleCount
+    case .History:
+      return false
+    }
+  }
+
+  private func showMoreResults(in section: SearchSection) {
+    switch section {
+    case .Artist:
+      artistsVisibleCount = min(
+        artistsVisibleCount + Self.categoryPageSize,
+        allArtistsIDs.count
+      )
+    case .Album:
+      albumsVisibleCount = min(
+        albumsVisibleCount + Self.categoryPageSize,
+        allAlbumsIDs.count
+      )
+    case .Playlist:
+      playlistsVisibleCount = min(
+        playlistsVisibleCount + Self.categoryPageSize,
+        allPlaylistsIDs.count
+      )
+    case .Featured:
+      featuredVisibleCount = min(
+        featuredVisibleCount + Self.categoryPageSize,
+        allFeaturedSongsIDs.count
+      )
+    case .Song:
+      songsVisibleCount = min(
+        songsVisibleCount + Self.categoryPageSize,
+        allSongsIDs.count
+      )
+    case .History:
+      return
+    }
+    resolveDisplayedResults()
+    updateDataSource(animated: true, reloadingSections: [section])
   }
 
   public func activateSearchBar() {
@@ -334,6 +453,9 @@ class SearchVC: BasicTableViewController {
         }
         completionHandler(SwipeActionContext(containable: album))
       }
+    case .Featured:
+      let song = featuredSongs[indexPath.row]
+      completionHandler(SwipeActionContext(containable: song))
     case .Song:
       let song = songs[indexPath.row]
       completionHandler(SwipeActionContext(containable: song))
@@ -346,6 +468,9 @@ class SearchVC: BasicTableViewController {
     guard let indexPath = tableView.indexPath(for: cell) else { return nil }
     if SearchSection(rawValue: indexPath.section) == .Song {
       let song = songs[indexPath.row]
+      return PlayContext(containable: song)
+    } else if SearchSection(rawValue: indexPath.section) == .Featured {
+      let song = featuredSongs[indexPath.row]
       return PlayContext(containable: song)
     } else if SearchSection(rawValue: indexPath.section) == .History {
       let history = searchHistory[indexPath.row]
@@ -400,6 +525,11 @@ class SearchVC: BasicTableViewController {
       let cell: GenericTableCell = dequeueCell(for: tableView, at: indexPath)
       let album = albums[indexPath.row]
       cell.display(container: album, rootView: self)
+      return cell
+    case .Featured:
+      let cell: PlayableTableCell = dequeueCell(for: tableView, at: indexPath)
+      let song = featuredSongs[indexPath.row]
+      cell.display(playable: song, playContextCb: convertCellViewToPlayContext, rootView: self)
       return cell
     case .Song:
       let cell: PlayableTableCell = dequeueCell(for: tableView, at: indexPath)
@@ -462,11 +592,53 @@ class SearchVC: BasicTableViewController {
     case .Album:
       return (isSearchActive && !albums.isEmpty) ? CommonScreenOperations
         .tableSectionHeightLarge : 0
+    case .Featured:
+      return (isSearchActive && !featuredSongs.isEmpty) ? CommonScreenOperations
+        .tableSectionHeightLarge : 0
     case .Song:
       return (isSearchActive && !songs.isEmpty) ? CommonScreenOperations.tableSectionHeightLarge : 0
     case .none:
       return 0.0
     }
+  }
+
+  override func tableView(
+    _ tableView: UITableView,
+    viewForFooterInSection section: Int
+  )
+    -> UIView? {
+    guard isSearchActive,
+          let searchSection = SearchSection(rawValue: section),
+          sectionHasMoreResults(searchSection) else { return nil }
+
+    // Plain UIView avoids UITableViewHeaderFooterView chrome / bottom separators.
+    let footer = UIView()
+    footer.backgroundColor = .clear
+    let showMoreButton = UIButton(
+      type: .system,
+      primaryAction: UIAction(title: "Show more") { [weak self] _ in
+        self?.showMoreResults(in: searchSection)
+      }
+    )
+    showMoreButton.translatesAutoresizingMaskIntoConstraints = false
+    showMoreButton.preferredBehavioralStyle = .pad
+    footer.addSubview(showMoreButton)
+    NSLayoutConstraint.activate([
+      showMoreButton.centerXAnchor.constraint(equalTo: footer.centerXAnchor),
+      showMoreButton.centerYAnchor.constraint(equalTo: footer.centerYAnchor),
+    ])
+    return footer
+  }
+
+  override func tableView(
+    _ tableView: UITableView,
+    heightForFooterInSection section: Int
+  )
+    -> CGFloat {
+    guard isSearchActive,
+          let searchSection = SearchSection(rawValue: section),
+          sectionHasMoreResults(searchSection) else { return 0 }
+    return CommonScreenOperations.tableSectionHeightLarge
   }
 
   override func tableView(
@@ -491,6 +663,8 @@ class SearchVC: BasicTableViewController {
       return GenericTableCell.rowHeight
     case .Album:
       return GenericTableCell.rowHeight
+    case .Featured:
+      return PlayableTableCell.rowHeight
     case .Song:
       return PlayableTableCell.rowHeight
     case .none:
@@ -532,6 +706,9 @@ class SearchVC: BasicTableViewController {
         AppStoryboard.Main.segueToAlbumDetail(account: account, album: album),
         animated: true
       )
+    case .Featured:
+      let song = featuredSongs[indexPath.row]
+      let _ = appDelegate.storage.main.library.createOrUpdateSearchHistory(container: song)
     case .Song:
       let song = songs[indexPath.row]
       let _ = appDelegate.storage.main.library.createOrUpdateSearchHistory(container: song)
@@ -544,7 +721,65 @@ class SearchVC: BasicTableViewController {
     var artistsIDs = [NSManagedObjectID]()
     var albumsIDs = [NSManagedObjectID]()
     var playlistsIDs = [NSManagedObjectID]()
+    var featuredSongsIDs = [NSManagedObjectID]()
     var songsIDs = [NSManagedObjectID]()
+  }
+
+  nonisolated private static func rankedSongIDs(
+    from songs: [Song],
+    searchText: String
+  )
+    -> [NSManagedObjectID] {
+    FuzzySearcher.findBestMatch(in: songs, search: searchText)
+      .prefix(upToAsArray: categoryResultCap)
+      .compactMap { $0 as? Song }
+      .compactMap { $0.managedObject.objectID }
+  }
+
+  /// Featured matches are on credit text, not title — keep Core Data order and skip Fuse filtering.
+  nonisolated private static func featuredSongIDs(
+    from songs: [Song],
+    excluding excludedIDs: Set<NSManagedObjectID>
+  )
+    -> [NSManagedObjectID] {
+    songs
+      .map(\.managedObject.objectID)
+      .filter { !excludedIDs.contains($0) }
+      .prefix(upToAsArray: categoryResultCap)
+  }
+
+  private func applySearchResult(_ searchResult: SearchResultObjectContainer) {
+    isSearchActive = true
+    searchHistory = []
+    resetPaginationVisibleCounts()
+    allArtistsIDs = searchResult.artistsIDs
+    allAlbumsIDs = searchResult.albumsIDs
+    allPlaylistsIDs = searchResult.playlistsIDs
+    allFeaturedSongsIDs = searchResult.featuredSongsIDs
+    allSongsIDs = searchResult.songsIDs
+    resolveDisplayedResults()
+    tableView.separatorStyle = .singleLine
+    updateDataSource(animated: false)
+    updateContentUnavailable()
+  }
+
+  private func applyFeaturedAndSongsResult(
+    featuredSongsIDs: [NSManagedObjectID],
+    songsIDs: [NSManagedObjectID]
+  ) {
+    allFeaturedSongsIDs = featuredSongsIDs
+    allSongsIDs = songsIDs
+    featuredVisibleCount = min(featuredVisibleCount, max(featuredSongsIDs.count, 0))
+    songsVisibleCount = min(songsVisibleCount, max(songsIDs.count, 0))
+    if featuredVisibleCount == 0, !featuredSongsIDs.isEmpty {
+      featuredVisibleCount = min(Self.categoryPageSize, featuredSongsIDs.count)
+    }
+    if songsVisibleCount == 0, !songsIDs.isEmpty {
+      songsVisibleCount = min(Self.categoryPageSize, songsIDs.count)
+    }
+    resolveDisplayedResults()
+    updateDataSource(animated: false, reloadingSections: [.Featured, .Song])
+    updateContentUnavailable()
   }
 
   override func updateSearchResults(for searchController: UISearchController) {
@@ -564,12 +799,47 @@ class SearchVC: BasicTableViewController {
         self.appDelegate.eventLogger.report(topic: "Albums Search", error: error)
       }}
 
-      Task { @MainActor in do {
-        try await self.appDelegate.getMeta(self.account.info).librarySyncer
-          .searchSongs(searchText: searchText)
-      } catch {
-        self.appDelegate.eventLogger.report(topic: "Songs Search", error: error)
-      }}
+      Task { @MainActor in
+        do {
+          try await self.appDelegate.getMeta(self.account.info).librarySyncer
+            .searchSongs(searchText: searchText)
+        } catch {
+          self.appDelegate.eventLogger.report(topic: "Songs Search", error: error)
+        }
+        guard searchText == self.searchController.searchBar.text,
+              !self.searchController.searchBar.isCachedScopeSelected else { return }
+        do {
+          let refreshed = try await self.appDelegate.storage.async.performAndGet { asyncCompanion in
+            let accountAsync = asyncCompanion.library.getAccount(managedObjectId: accountObjectId)
+            let songs = asyncCompanion.library.searchSongs(
+              for: accountAsync,
+              searchText: searchText,
+              onlyCached: false,
+              displayFilter: .all
+            )
+            let featured = asyncCompanion.library.searchFeaturedSongs(
+              for: accountAsync,
+              searchText: searchText,
+              onlyCached: false,
+              displayFilter: .all
+            )
+            let songsIDs = Self.rankedSongIDs(from: songs, searchText: searchText)
+            let featuredSongsIDs = Self.featuredSongIDs(
+              from: featured,
+              excluding: Set(songsIDs)
+            )
+            return (featuredSongsIDs, songsIDs)
+          }
+          guard searchText == self.searchController.searchBar.text,
+                !self.searchController.searchBar.isCachedScopeSelected else { return }
+          self.applyFeaturedAndSongsResult(
+            featuredSongsIDs: refreshed.0,
+            songsIDs: refreshed.1
+          )
+        } catch {
+          // do nothing
+        }
+      }
 
       Task { @MainActor in do {
         let searchResult = try await appDelegate.storage.async.performAndGet { asyncCompanion in
@@ -597,46 +867,36 @@ class SearchVC: BasicTableViewController {
             onlyCached: false,
             displayFilter: .all
           )
+          let featured = asyncCompanion.library.searchFeaturedSongs(
+            for: accountAsync,
+            searchText: searchText,
+            onlyCached: false,
+            displayFilter: .all
+          )
 
           var result = SearchResultObjectContainer()
           result.artistsIDs = FuzzySearcher.findBestMatch(in: artists, search: searchText)
-            .prefix(upToAsArray: Self.categoryItemLimit)
+            .prefix(upToAsArray: Self.categoryResultCap)
             .compactMap { $0 as? Artist }
             .compactMap { $0.managedObject.objectID }
           result.albumsIDs = FuzzySearcher.findBestMatch(in: albums, search: searchText)
-            .prefix(upToAsArray: Self.categoryItemLimit)
+            .prefix(upToAsArray: Self.categoryResultCap)
             .compactMap { $0 as? Album }
             .compactMap { $0.managedObject.objectID }
           result.playlistsIDs = FuzzySearcher.findBestMatch(in: playlists, search: searchText)
-            .prefix(upToAsArray: Self.categoryItemLimit)
+            .prefix(upToAsArray: Self.categoryResultCap)
             .compactMap { $0 as? Playlist }
             .compactMap { $0.managedObject.objectID }
-          result.songsIDs = FuzzySearcher.findBestMatch(in: songs, search: searchText)
-            .prefix(upToAsArray: Self.categoryItemLimit)
-            .compactMap { $0 as? Song }
-            .compactMap { $0.managedObject.objectID }
+          result.songsIDs = Self.rankedSongIDs(from: songs, searchText: searchText)
+          result.featuredSongsIDs = Self.featuredSongIDs(
+            from: featured,
+            excluding: Set(result.songsIDs)
+          )
           return result
         }
 
         guard searchText == self.searchController.searchBar.text else { return }
-        self.isSearchActive = true
-        self.searchHistory = []
-        self.artists = searchResult.artistsIDs
-          .compactMap { self.appDelegate.storage.main.context.object(with: $0) as? ArtistMO }
-          .compactMap { Artist(managedObject: $0) }
-        self.albums = searchResult.albumsIDs
-          .compactMap { self.appDelegate.storage.main.context.object(with: $0) as? AlbumMO }
-          .compactMap { Album(managedObject: $0) }
-        self.playlists = searchResult.playlistsIDs
-          .compactMap { self.appDelegate.storage.main.context.object(with: $0) as? PlaylistMO }
-          .compactMap { Playlist(library: self.appDelegate.storage.main.library, managedObject: $0)
-          }
-        self.songs = searchResult.songsIDs
-          .compactMap { self.appDelegate.storage.main.context.object(with: $0) as? SongMO }
-          .compactMap { Song(managedObject: $0) }
-        self.tableView.separatorStyle = .singleLine
-        self.updateDataSource(animated: false)
-        self.updateContentUnavailable()
+        self.applySearchResult(searchResult)
       } catch {
         // do nothing
       }}
@@ -667,46 +927,36 @@ class SearchVC: BasicTableViewController {
             onlyCached: true,
             displayFilter: .all
           )
+          let featured = asyncCompanion.library.searchFeaturedSongs(
+            for: accountAsync,
+            searchText: searchText,
+            onlyCached: true,
+            displayFilter: .all
+          )
 
           var result = SearchResultObjectContainer()
           result.artistsIDs = FuzzySearcher.findBestMatch(in: artists, search: searchText)
-            .prefix(upToAsArray: Self.categoryItemLimit)
+            .prefix(upToAsArray: Self.categoryResultCap)
             .compactMap { $0 as? Artist }
             .compactMap { $0.managedObject.objectID }
           result.albumsIDs = FuzzySearcher.findBestMatch(in: albums, search: searchText)
-            .prefix(upToAsArray: Self.categoryItemLimit)
+            .prefix(upToAsArray: Self.categoryResultCap)
             .compactMap { $0 as? Album }
             .compactMap { $0.managedObject.objectID }
           result.playlistsIDs = FuzzySearcher.findBestMatch(in: playlists, search: searchText)
-            .prefix(upToAsArray: Self.categoryItemLimit)
+            .prefix(upToAsArray: Self.categoryResultCap)
             .compactMap { $0 as? Playlist }
             .compactMap { $0.managedObject.objectID }
-          result.songsIDs = FuzzySearcher.findBestMatch(in: songs, search: searchText)
-            .prefix(upToAsArray: Self.categoryItemLimit)
-            .compactMap { $0 as? Song }
-            .compactMap { $0.managedObject.objectID }
+          result.songsIDs = Self.rankedSongIDs(from: songs, searchText: searchText)
+          result.featuredSongsIDs = Self.featuredSongIDs(
+            from: featured,
+            excluding: Set(result.songsIDs)
+          )
           return result
         }
 
         guard searchText == self.searchController.searchBar.text else { return }
-        self.isSearchActive = true
-        self.searchHistory = []
-        self.artists = searchResult.artistsIDs
-          .compactMap { self.appDelegate.storage.main.context.object(with: $0) as? ArtistMO }
-          .compactMap { Artist(managedObject: $0) }
-        self.albums = searchResult.albumsIDs
-          .compactMap { self.appDelegate.storage.main.context.object(with: $0) as? AlbumMO }
-          .compactMap { Album(managedObject: $0) }
-        self.playlists = searchResult.playlistsIDs
-          .compactMap { self.appDelegate.storage.main.context.object(with: $0) as? PlaylistMO }
-          .compactMap { Playlist(library: self.appDelegate.storage.main.library, managedObject: $0)
-          }
-        self.songs = searchResult.songsIDs
-          .compactMap { self.appDelegate.storage.main.context.object(with: $0) as? SongMO }
-          .compactMap { Song(managedObject: $0) }
-        self.tableView.separatorStyle = .singleLine
-        self.updateDataSource(animated: false)
-        self.updateContentUnavailable()
+        self.applySearchResult(searchResult)
       } catch {
         // do nothing
       }}
@@ -717,7 +967,7 @@ class SearchVC: BasicTableViewController {
 
   func updateContentUnavailable() {
     if isSearchActive {
-      if artists.isEmpty, albums.isEmpty, playlists.isEmpty, songs.isEmpty {
+      if artists.isEmpty, albums.isEmpty, playlists.isEmpty, featuredSongs.isEmpty, songs.isEmpty {
         contentUnavailableConfiguration = UIContentUnavailableConfiguration.search()
       } else {
         contentUnavailableConfiguration = nil

@@ -2479,6 +2479,84 @@ public class LibraryStorage: PlayableFileCachable {
     return wrapped ?? [Song]()
   }
 
+  /// Songs whose multi-artist credits (or an embedded feat./ft. title) match the query.
+  /// Does not match on primary `artist.name` alone.
+  public func getSearchFeaturedSongsPredicate(
+    for account: Account,
+    searchText: String,
+    onlyCached: Bool,
+    displayFilter: DisplayCategoryFilter
+  )
+    -> NSPredicate {
+    let featuredMatch: NSPredicate
+    if searchText.isEmpty {
+      featuredMatch = NSPredicate(value: false)
+    } else {
+      featuredMatch = NSCompoundPredicate(orPredicateWithSubpredicates: [
+        NSPredicate(
+          format: "%K contains[cd] %@",
+          #keyPath(AbstractPlayableMO.artistsText),
+          searchText
+        ),
+        NSPredicate(
+          format: "%K contains[cd] %@",
+          #keyPath(AbstractPlayableMO.displayArtist),
+          searchText
+        ),
+        NSCompoundPredicate(andPredicateWithSubpredicates: [
+          NSPredicate(
+            format: "%K contains[cd] %@",
+            #keyPath(AbstractPlayableMO.title),
+            searchText
+          ),
+          NSCompoundPredicate(orPredicateWithSubpredicates: [
+            NSPredicate(
+              format: "%K contains[cd] %@",
+              #keyPath(AbstractPlayableMO.title),
+              "feat."
+            ),
+            NSPredicate(
+              format: "%K contains[cd] %@",
+              #keyPath(AbstractPlayableMO.title),
+              "ft."
+            ),
+            NSPredicate(
+              format: "%K contains[cd] %@",
+              #keyPath(AbstractPlayableMO.title),
+              "featuring"
+            ),
+          ]),
+        ]),
+      ])
+    }
+    return NSCompoundPredicate(andPredicateWithSubpredicates: [
+      getFetchPredicate(forAccount: account),
+      SongMO.excludeServerDeleteUncachedSongsFetchPredicate,
+      featuredMatch,
+      getFetchPredicate(onlyCachedSongs: onlyCached),
+      getFetchPredicate(songsDisplayFilter: displayFilter),
+    ])
+  }
+
+  public func searchFeaturedSongs(
+    for account: Account,
+    searchText: String,
+    onlyCached: Bool,
+    displayFilter: DisplayCategoryFilter
+  )
+    -> [Song] {
+    let fetchRequest = SongMO.identifierSortedFetchRequest
+    fetchRequest.predicate = getSearchFeaturedSongsPredicate(
+      for: account,
+      searchText: searchText,
+      onlyCached: onlyCached,
+      displayFilter: displayFilter
+    )
+    let found = try? context.fetch(fetchRequest)
+    let wrapped = found?.compactMap { Song(managedObject: $0) }
+    return wrapped ?? [Song]()
+  }
+
   public struct PrefetchIdContainer {
     public var artworkIDs = Set<ArtworkRemoteInfo>()
     public var genreIDs = Set<String>()
