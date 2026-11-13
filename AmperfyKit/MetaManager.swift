@@ -149,10 +149,12 @@ public class MetaManager {
       isFailWithPopupError: true
     )
 
-    let configuration = URLSessionConfiguration
-      .background(
-        withIdentifier: "\(Bundle.main.bundleIdentifier!).\(account.ident).PlayableDownloader.background"
-      )
+    // Use a foreground session. Background URLSession transfers often fail with
+    // "Fetch Failed" on TrollStore / sideloaded / ldid-signed builds (no proper
+    // background transfer daemon entitlements). Artwork downloads already use default.
+    let configuration = URLSessionConfiguration.default
+    configuration.httpMaximumConnectionsPerHost = 4
+    configuration.waitsForConnectivity = true
     let urlSession = URLSession(
       configuration: configuration,
       delegate: dlManager,

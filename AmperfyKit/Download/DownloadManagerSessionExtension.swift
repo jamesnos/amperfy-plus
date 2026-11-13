@@ -95,7 +95,14 @@ extension DownloadManager: URLSessionDelegate, URLSessionDownloadDelegate {
     task: URLSessionTask,
     didCompleteWithError error: Error?
   ) {
-    guard error != nil else { return }
+    guard let error else { return }
+    os_log(
+      "URLSession task failed: %s (%{public}s)",
+      log: self.log,
+      type: .error,
+      error.localizedDescription,
+      String(describing: (error as NSError).code)
+    )
     Task {
       guard let taskInfo = await tasks[task] else { return }
       await self.finishDownload(downloadRequest: taskInfo.request, task: task, error: .fetchFailed)

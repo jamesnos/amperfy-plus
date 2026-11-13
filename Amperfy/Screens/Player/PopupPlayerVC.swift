@@ -191,11 +191,13 @@ class PopupPlayerVC: UIViewController, UIScrollViewDelegate {
     super.viewIsAppearing(animated)
     appDelegate.userStatistics.visited(.popupPlayer)
     becomeFirstResponder()
+    // Load rows before any scroll/display-style work — scrolling to
+    // currentlyPlaying before reloadData crashes on iOS 16 (empty table).
+    reloadData()
     changeDisplayStyleVisually(
       to: appDelegate.storage.settings.user.playerDisplayStyle,
       animated: false
     )
-    reloadData()
     scrollToCurrentlyPlayingRow()
     controlView?.refreshView()
     refresh()
@@ -230,8 +232,12 @@ class PopupPlayerVC: UIViewController, UIScrollViewDelegate {
   }
 
   func scrollToCurrentlyPlayingRow() {
+    let section = PlayerSectionCategory.currentlyPlaying.rawValue
+    guard tableView.numberOfSections > section,
+          tableView.numberOfRows(inSection: section) > 0
+    else { return }
     tableView.scrollToRow(
-      at: IndexPath(row: 0, section: PlayerSectionCategory.currentlyPlaying.rawValue),
+      at: IndexPath(row: 0, section: section),
       at: .top,
       animated: false
     )

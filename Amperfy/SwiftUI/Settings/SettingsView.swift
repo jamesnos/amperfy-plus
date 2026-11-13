@@ -128,7 +128,7 @@ struct SettingsView: View {
           // (NavigationLink(destination:)) with the value based links of the sub pages
           // results in a navigation loop.
           .navigationDestination(for: NavigationTarget.self) { item in
-            AnyView(item.view())
+            item.view()
           }
       }
     #endif

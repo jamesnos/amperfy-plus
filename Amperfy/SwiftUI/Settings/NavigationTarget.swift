@@ -39,7 +39,8 @@ enum NavigationTarget: String, CaseIterable, @MainActor Identifiable {
 
   var id: String { rawValue }
 
-  func view() -> any View {
+  @ViewBuilder
+  func view() -> some View {
     switch self {
     case .general: SettingsView()
     case .displayAndInteraction: DisplaySettingsView()

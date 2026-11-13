@@ -72,7 +72,10 @@ class TabBarVC: UITabBarController {
     super.viewDidLoad()
     delegate = self
 
-    if #available(iOS 18.0, *) {
+    // UITab / bottomAccessory chrome only works correctly with iOS 26+.
+    // On iOS 18–25, modern tabs leave a tall empty strip above the icons when
+    // the mini-player is overlaid manually — keep classic tabs until then.
+    if #available(iOS 26.0, *) {
       setupModernTabs()
     } else {
       setupClassicTabs()
@@ -213,28 +216,40 @@ class TabBarVC: UITabBarController {
   private func installClassicMiniPlayer() {
     guard let miniPlayer else { return }
     let container = miniPlayer.glassContainer
-    view.addSubview(container)
+    if container.superview !== view {
+      view.addSubview(container)
+    }
     container.translatesAutoresizingMaskIntoConstraints = false
 
+    // Pin just above the system tab bar. Do NOT pad TabBarVC.additionalSafeAreaInsets —
+    // that stretches the tab bar itself. Child VCs use getSafeAreaExtension() instead.
+    classicMiniPlayerBottomConstraint?.isActive = false
     let bottom = container.bottomAnchor.constraint(
       equalTo: tabBar.topAnchor,
-      constant: -8
+      constant: -6
     )
     classicMiniPlayerBottomConstraint = bottom
     NSLayoutConstraint.activate([
-      container.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
-      container.trailingAnchor.constraint(
-        equalTo: view.safeAreaLayoutGuide.trailingAnchor,
-        constant: -12
-      ),
+      container.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+      container.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
       bottom,
     ])
-    applyClassicMiniPlayerInsets()
+    // Keep a compact bar on classic (pre-bottomAccessory) layout, including iPad.
+    heightConstraint?.constant = 48.0
+    view.bringSubviewToFront(container)
+    notifyChildrenOfMiniPlayerInsetChange()
   }
 
-  private func applyClassicMiniPlayerInsets() {
-    let height = heightConstraint?.constant ?? 48
-    additionalSafeAreaInsets.bottom = height + 16
+  private var lastNotifiedMiniPlayerInset: CGFloat = -1
+
+  private func notifyChildrenOfMiniPlayerInsetChange() {
+    let inset = getSafeAreaExtension()
+    guard inset != lastNotifiedMiniPlayerInset else { return }
+    lastNotifiedMiniPlayerInset = inset
+    viewControllers?.forEach { vc in
+      let target = (vc as? UINavigationController)?.topViewController ?? vc
+      target.extendSafeAreaToAccountForMiniPlayer()
+    }
   }
 
   private func registerMiniPlayerTraitObservers() {
@@ -281,8 +296,14 @@ class TabBarVC: UITabBarController {
       let isInline = miniPlayer.glassContainer.traitCollection.tabAccessoryEnvironment == .inline
       applyMiniPlayerLayout(isInline: isInline)
     } else {
-      applyMiniPlayerLayout(isInline: false)
-      applyClassicMiniPlayerInsets()
+      // Classic overlay mini-player: keep a fixed compact height on all size classes.
+      // Do not poke child safe-area insets from layout — that causes a layout loop.
+      heightConstraint?.constant = 48.0
+      centerConstraint?.isActive = false
+      regularWidthConstraint?.isActive = false
+      compactWidthConstraint?.isActive = false
+      miniPlayer.glassContainer.setNeedsLayout()
+      miniPlayer.glassContainer.layoutIfNeeded()
     }
   }
 
@@ -326,6 +347,21 @@ class TabBarVC: UITabBarController {
   override func viewWillLayoutSubviews() {
     super.viewWillLayoutSubviews()
     configureTraitChangesForMiniPlayer()
+  }
+
+  override func viewDidLayoutSubviews() {
+    super.viewDidLayoutSubviews()
+    if #available(iOS 26.0, *) { return }
+    guard let container = miniPlayer?.glassContainer, container.superview === view else { return }
+    // Keep the overlay docked above the real system tab bar after layout.
+    if classicMiniPlayerBottomConstraint?.isActive != true {
+      classicMiniPlayerBottomConstraint = container.bottomAnchor.constraint(
+        equalTo: tabBar.topAnchor,
+        constant: -6
+      )
+      classicMiniPlayerBottomConstraint?.isActive = true
+    }
+    view.bringSubviewToFront(container)
   }
 
   override func viewIsAppearing(_ animated: Bool) {
@@ -465,6 +501,7 @@ extension TabBarVC: MainSceneHostingViewController {
     if #available(iOS 26.0, *) {
       return 0.0
     }
-    return (heightConstraint?.constant ?? 48) + 16
+    // Mini-player height + a little breathing room above the tab bar.
+    return (heightConstraint?.constant ?? 48) + 8
   }
 }

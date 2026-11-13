@@ -126,7 +126,7 @@ extension UIViewController {
     userBarButtonItem: inout UIBarButtonItem?
   ) {
     let image = UIImage.userCircle(withConfiguration: UIImage.SymbolConfiguration(
-      pointSize: 24,
+      pointSize: 22,
       weight: .regular
     )).withTintColor(
       appDelegate.storage.settings.accounts.getSetting(currentAccount.info).read
@@ -134,20 +134,13 @@ extension UIViewController {
       renderingMode: .alwaysTemplate
     )
 
-    let button = UIButton(type: .system)
-    button.setImage(image, for: .normal)
-    button.layer.cornerRadius = 20
-    button.clipsToBounds = true
-    #if targetEnvironment(macCatalyst)
-      button.frame = CGRect(x: 0, y: 0, width: 50, height: 50)
-    #else
-      button.frame = CGRect(x: 0, y: 0, width: 40, height: 40)
-    #endif
-    button.menu = createUserButtonMenu()
-    button.showsMenuAsPrimaryAction = true
-    userButton = button
-
-    userBarButtonItem = UIBarButtonItem(customView: button)
-    navigationItem.leftBarButtonItem = userBarButtonItem!
+    // Prefer a standard bar-button item so large/inline titles don't clip a custom view
+    // into the status-bar area (especially with a stacked search field on iPad).
+    let item = UIBarButtonItem(image: image, menu: createUserButtonMenu())
+    item.tintColor = appDelegate.storage.settings.accounts.getSetting(currentAccount.info).read
+      .themePreference.asColor
+    userButton = nil
+    userBarButtonItem = item
+    navigationItem.leftBarButtonItem = item
   }
 }

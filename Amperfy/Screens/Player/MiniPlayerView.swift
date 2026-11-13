@@ -718,12 +718,14 @@ class MiniPlayerView: UIView {
   }
 
   public func refreshForTraitChange(horizontalSizeClass: UIUserInterfaceSizeClass) {
-    if horizontalSizeClass == .regular {
+    // Keep readable title > artist hierarchy in the compact overlay mini-player.
+    // (Regular-size fonts from the glass accessory layout made iPad look inverted.)
+    if #available(iOS 26.0, *), horizontalSizeClass == .regular {
       titleLabel.font = .systemFont(ofSize: 8.0)
       subtitleLabel.font = .systemFont(ofSize: 15.0)
     } else {
-      titleLabel.font = .systemFont(ofSize: 11.0)
-      subtitleLabel.font = .systemFont(ofSize: 13.0)
+      titleLabel.font = .systemFont(ofSize: 13.0, weight: .semibold)
+      subtitleLabel.font = .systemFont(ofSize: 12.0)
     }
   }
 

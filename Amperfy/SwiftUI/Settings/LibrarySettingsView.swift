@@ -33,7 +33,8 @@ struct LibrarySettingsView: View {
   @EnvironmentObject
   private var settings: Settings
 
-  let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+  /// Static so SwiftUI body re-evals don't create/reconnect a new timer each time.
+  private static let refreshTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
   let fileManager = CacheFileManager.shared
 
   @State
@@ -67,6 +68,8 @@ struct LibrarySettingsView: View {
   var isShowDeleteCacheAlert = false
   @State
   var isShowDownloadSongsAlert = false
+  @State
+  private var isUpdatingValues = false
 
   let byteValues = (
     stride(from: 0, through: 20, by: 1).map { $0.description } +
@@ -76,7 +79,11 @@ struct LibrarySettingsView: View {
   )
 
   private func updateValues() {
-    Task { @MainActor in do {
+    guard !isUpdatingValues else { return }
+    isUpdatingValues = true
+    Task { @MainActor in
+      defer { isUpdatingValues = false }
+      do {
       guard let activeAccountInfo = settings.activeAccountInfo else { return }
       let accountObjectId = appDelegate.storage.main.library
         .getAccount(info: activeAccountInfo).managedObject.objectID
@@ -134,14 +141,30 @@ struct LibrarySettingsView: View {
       }
 
       let curCacheSizeLimit = Int64(settings.cacheSizeLimit)
-      cacheSizeLimit = curCacheSizeLimit > 0 ? curCacheSizeLimit.asByteString : "No Limit"
-      cacheSelection = curCacheSizeLimit > 0 ? [
-        curCacheSizeLimit.asByteString.components(separatedBy: " ")[0],
-        " " + curCacheSizeLimit.asByteString.components(separatedBy: " ")[1]
-      ] : ["0", " MB"]
-    } catch {
-      // do nothing
-    }}
+      let newLimitLabel = curCacheSizeLimit > 0 ? curCacheSizeLimit.asByteString : "No Limit"
+      if cacheSizeLimit != newLimitLabel {
+        cacheSizeLimit = newLimitLabel
+      }
+      let newSelection: [String]
+      if curCacheSizeLimit > 0 {
+        let parts = curCacheSizeLimit.asByteString
+          .components(separatedBy: CharacterSet.whitespaces)
+          .filter { !$0.isEmpty }
+        if parts.count >= 2 {
+          newSelection = [parts[0], " " + parts[1]]
+        } else {
+          newSelection = ["0", " MB"]
+        }
+      } else {
+        newSelection = ["0", " MB"]
+      }
+      if cacheSelection != newSelection {
+        cacheSelection = newSelection
+      }
+      } catch {
+        // do nothing
+      }
+    }
   }
 
   var body: some View {
@@ -183,16 +206,6 @@ struct LibrarySettingsView: View {
         }, header: "Background song sync")
 
         SettingsSection(content: {
-          let changeHandler: ([String], [String]) -> () = { oldCacheString, newCacheString in
-            if newCacheString[1] == "" {
-              settings.cacheSizeLimit = 0
-              cacheSelection = ["0", " MB"]
-            }
-            if let cacheInByte = (newCacheString[0] + newCacheString[1]).asByteCount {
-              settings.cacheSizeLimit = cacheInByte
-            }
-          }
-
           SettingsRow(title: "Cached Songs") { SecondaryText(cachedSongCount.description) }
           SettingsRow(title: "Cached Podcast Episodes") {
             SecondaryText(cachedPodcastEpisodesCount.description)
@@ -209,16 +222,13 @@ struct LibrarySettingsView: View {
               selection: $cacheSelection
             )
             .onChange(of: cacheSelection) { newCacheString in
-              changeHandler(cacheSelection, newCacheString)
+              applyCacheSelection(newCacheString)
             }
           #else
             NavigationLink(value: Destination.cacheSizeLimit) {
               SettingsRow(title: "Cache Size Limit") {
                 SecondaryText(cacheSizeLimit.description)
               }
-            }
-            .onChange(of: cacheSelection) { newCacheString in
-              changeHandler(cacheSelection, newCacheString)
             }
           #endif
 
@@ -286,17 +296,36 @@ struct LibrarySettingsView: View {
           selection: $cacheSelection
         )
         .navigationTitle("Cache Size Limit")
+        // Only react to user picker changes here — not while refreshing counts on the
+        // Library page (that was republishing Settings and freezing navigation).
+        .onChange(of: cacheSelection) { newCacheString in
+          applyCacheSelection(newCacheString)
+        }
       }
     }
     .onAppear {
       updateValues()
       appDelegate.userStatistics.visited(.settingsLibrary)
     }
-    .onReceive(timer) { _ in
+    .onReceive(Self.refreshTimer) { _ in
       updateValues()
     }
-    .onDisappear {
-      timer.upstream.connect().cancel()
+  }
+
+  private func applyCacheSelection(_ newCacheString: [String]) {
+    guard newCacheString.count >= 2 else { return }
+    if newCacheString[1].trimmingCharacters(in: .whitespaces).isEmpty {
+      if settings.cacheSizeLimit != 0 {
+        settings.cacheSizeLimit = 0
+      }
+      if cacheSelection != ["0", " MB"] {
+        cacheSelection = ["0", " MB"]
+      }
+      return
+    }
+    if let cacheInByte = (newCacheString[0] + newCacheString[1]).asByteCount,
+       settings.cacheSizeLimit != cacheInByte {
+      settings.cacheSizeLimit = cacheInByte
     }
   }
 }

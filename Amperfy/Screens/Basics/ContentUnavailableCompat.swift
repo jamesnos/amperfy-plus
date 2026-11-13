@@ -34,39 +34,31 @@ extension UIViewController {
   private static var unavailableOverlayTag = 9_711_604
 
   func setAmperfyUnavailableContent(_ content: AmperfyUnavailableContent?) {
+    // Always use our centered overlay. UIContentUnavailableConfiguration on iPad
+    // (and overlay-as-table-subview) sits under the search bar instead of mid-screen.
     if #available(iOS 17.0, *) {
-      removeLegacyUnavailableOverlay()
-      guard let content else {
-        contentUnavailableConfiguration = nil
-        return
-      }
-      if content.text == AmperfyUnavailableContent.search().text,
-         content.secondaryText == AmperfyUnavailableContent.search().secondaryText {
-        contentUnavailableConfiguration = UIContentUnavailableConfiguration.search()
-        return
-      }
-      var config = UIContentUnavailableConfiguration.empty()
-      config.image = content.image
-      config.text = content.text
-      config.secondaryText = content.secondaryText
-      contentUnavailableConfiguration = config
-    } else {
-      applyLegacyUnavailableOverlay(content)
+      contentUnavailableConfiguration = nil
     }
+    applyLegacyUnavailableOverlay(content)
   }
 
   private func removeLegacyUnavailableOverlay() {
+    if let tableVC = self as? UITableViewController,
+       tableVC.tableView.backgroundView?.tag == Self.unavailableOverlayTag {
+      tableVC.tableView.backgroundView = nil
+    }
+    if let collectionVC = self as? UICollectionViewController,
+       collectionVC.collectionView.backgroundView?.tag == Self.unavailableOverlayTag {
+      collectionVC.collectionView.backgroundView = nil
+    }
     view.viewWithTag(Self.unavailableOverlayTag)?.removeFromSuperview()
   }
 
-  private func applyLegacyUnavailableOverlay(_ content: AmperfyUnavailableContent?) {
-    removeLegacyUnavailableOverlay()
-    guard let content else { return }
-
+  private func makeUnavailableOverlay(_ content: AmperfyUnavailableContent) -> UIView {
     let overlay = UIView()
     overlay.tag = Self.unavailableOverlayTag
-    overlay.translatesAutoresizingMaskIntoConstraints = false
     overlay.isUserInteractionEnabled = false
+    overlay.backgroundColor = .clear
 
     let stack = UIStackView()
     stack.axis = .vertical
@@ -88,7 +80,7 @@ extension UIViewController {
     if let text = content.text {
       let label = UILabel()
       label.text = text
-      label.font = .preferredFont(forTextStyle: .headline)
+      label.font = .preferredFont(forTextStyle: .title2)
       label.textColor = .label
       label.textAlignment = .center
       label.numberOfLines = 0
@@ -105,16 +97,39 @@ extension UIViewController {
     }
 
     overlay.addSubview(stack)
-    view.addSubview(overlay)
     NSLayoutConstraint.activate([
-      overlay.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-      overlay.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-      overlay.topAnchor.constraint(equalTo: view.topAnchor),
-      overlay.bottomAnchor.constraint(equalTo: view.bottomAnchor),
       stack.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
       stack.centerYAnchor.constraint(equalTo: overlay.centerYAnchor),
-      stack.leadingAnchor.constraint(greaterThanOrEqualTo: overlay.leadingAnchor, constant: 24),
-      stack.trailingAnchor.constraint(lessThanOrEqualTo: overlay.trailingAnchor, constant: -24),
+      stack.leadingAnchor.constraint(greaterThanOrEqualTo: overlay.leadingAnchor, constant: 32),
+      stack.trailingAnchor.constraint(lessThanOrEqualTo: overlay.trailingAnchor, constant: -32),
+    ])
+    return overlay
+  }
+
+  private func applyLegacyUnavailableOverlay(_ content: AmperfyUnavailableContent?) {
+    removeLegacyUnavailableOverlay()
+    guard let content else { return }
+
+    let overlay = makeUnavailableOverlay(content)
+
+    if let tableVC = self as? UITableViewController {
+      // backgroundView is sized to the visible table bounds (below search), so
+      // centerY is truly mid-screen — not the top of the scroll content.
+      tableVC.tableView.backgroundView = overlay
+      return
+    }
+    if let collectionVC = self as? UICollectionViewController {
+      collectionVC.collectionView.backgroundView = overlay
+      return
+    }
+
+    overlay.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(overlay)
+    NSLayoutConstraint.activate([
+      overlay.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+      overlay.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+      overlay.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+      overlay.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
     ])
   }
 }

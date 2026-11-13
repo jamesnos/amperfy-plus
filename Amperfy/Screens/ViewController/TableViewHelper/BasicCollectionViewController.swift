@@ -70,9 +70,14 @@ class BasicCollectionViewController: UICollectionViewController {
     navigationItem.searchController = searchController
     navigationItem.hidesSearchBarWhenScrolling = true
     #if targetEnvironment(macCatalyst)
-      navigationItem.preferredSearchBarPlacement = .integrated
+      if #available(macCatalyst 26.0, *) {
+        navigationItem.preferredSearchBarPlacement = .integrated
+      } else {
+        navigationItem.preferredSearchBarPlacement = .automatic
+      }
     #else
-      navigationItem.preferredSearchBarPlacement = .automatic
+      // Stack under the title so large-title + search don't sit at different heights on iPad.
+      navigationItem.preferredSearchBarPlacement = .stacked
     #endif
 
     searchController.delegate = self

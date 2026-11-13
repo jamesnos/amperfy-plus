@@ -41,7 +41,7 @@ Everything from upstream Amperfy, including:
    ./make-dmg.sh
    ```
 
-   Output: `build/AmperfyPlus-0.2.0.dmg` (ad-hoc signed for personal use; right-click → Open on first launch if Gatekeeper prompts).
+   Output: `build/AmperfyPlus-0.3.0.dmg` (ad-hoc signed for personal use; right-click → Open on first launch if Gatekeeper prompts).
 
 > Real device testing: Amperfy has Apple CarPlay and Siri support. To test those on a real device, a developer certificate with `com.apple.developer.playable-content` and `com.apple.developer.siri` is required. To test without CarPlay and Siri, clear the entries in `Amperfy/Amperfy.entitlements`.
 

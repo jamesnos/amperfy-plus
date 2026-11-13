@@ -267,7 +267,8 @@ extension Array {
   }
 
   public func prefix(upToAsArray: Int) -> [Element] {
-    Array(prefix(upToAsArray))
+    // Use maxLength form explicitly — `prefix(upTo:)` crashes if the index is past end.
+    Array(prefix(Swift.max(0, upToAsArray)))
   }
 }
 

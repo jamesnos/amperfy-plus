@@ -98,6 +98,8 @@ class SearchVC: BasicTableViewController {
   private var userButton: UIButton?
   private var userBarButtonItem: UIBarButtonItem?
   private var isSearchActive = false
+  /// Bumped on every search-text change so stale async results are ignored.
+  private var searchGeneration = 0
   private var accountObjectId: NSManagedObjectID?
   private let account: Account
   private var accountNotificationHandler: AccountNotificationHandler?
@@ -188,17 +190,17 @@ class SearchVC: BasicTableViewController {
     containableAtIndexPathCallback = { indexPath in
       switch SearchSection(rawValue: indexPath.section) {
       case .History:
-        return self.searchHistory[indexPath.row].searchedPlayableContainable
+        return self.searchHistoryItem(at: indexPath.row)?.searchedPlayableContainable
       case .Playlist:
-        return self.playlists[indexPath.row]
+        return self.playlistAt(indexPath.row)
       case .Artist:
-        return self.artists[indexPath.row]
+        return self.artistAt(indexPath.row)
       case .Album:
-        return self.albums[indexPath.row]
+        return self.albumAt(indexPath.row)
       case .Featured:
-        return self.featuredSongs[indexPath.row]
+        return self.featuredSongAt(indexPath.row)
       case .Song:
-        return self.songs[indexPath.row]
+        return self.songAt(indexPath.row)
       case .none:
         return nil
       }
@@ -206,23 +208,23 @@ class SearchVC: BasicTableViewController {
     playContextAtIndexPathCallback = { indexPath in
       switch SearchSection(rawValue: indexPath.section) {
       case .History:
-        let history = self.searchHistory[indexPath.row]
-        guard let container = history.searchedPlayableContainable else { return nil }
+        guard let container = self.searchHistoryItem(at: indexPath.row)?
+          .searchedPlayableContainable else { return nil }
         return PlayContext(containable: container)
       case .Playlist:
-        let entity = self.playlists[indexPath.row]
+        guard let entity = self.playlistAt(indexPath.row) else { return nil }
         return PlayContext(containable: entity)
       case .Artist:
-        let entity = self.artists[indexPath.row]
+        guard let entity = self.artistAt(indexPath.row) else { return nil }
         return PlayContext(containable: entity)
       case .Album:
-        let entity = self.albums[indexPath.row]
+        guard let entity = self.albumAt(indexPath.row) else { return nil }
         return PlayContext(containable: entity)
       case .Featured:
-        let entity = self.featuredSongs[indexPath.row]
+        guard let entity = self.featuredSongAt(indexPath.row) else { return nil }
         return PlayContext(containable: entity)
       case .Song:
-        let entity = self.songs[indexPath.row]
+        guard let entity = self.songAt(indexPath.row) else { return nil }
         return PlayContext(containable: entity)
       case .none:
         return nil
@@ -250,7 +252,9 @@ class SearchVC: BasicTableViewController {
 
   override func viewWillAppear(_ animated: Bool) {
     super.viewWillAppear(animated)
+    // Inline title avoids large-title + search-field collision on iPad.
     navigationController?.navigationBar.prefersLargeTitles = true
+    navigationItem.largeTitleDisplayMode = .never
   }
 
   override func viewIsAppearing(_ animated: Bool) {
@@ -261,6 +265,9 @@ class SearchVC: BasicTableViewController {
       placeholder: "Search in \"Library\"",
       scopeButtonTitles: ["All", "Cached"]
     )
+    navigationItem.largeTitleDisplayMode = .never
+    navigationItem.hidesSearchBarWhenScrolling = false
+    navigationItem.preferredSearchBarPlacement = .stacked
     let searchText = searchController.searchBar.text ?? ""
     if searchText.isEmpty {
       reloadSearchHistory()
@@ -271,8 +278,9 @@ class SearchVC: BasicTableViewController {
     searchHistory = appDelegate.storage.main.library.getSearchHistory(for: account)
     isSearchActive = false
     clearRankedSearchResults()
-    tableView.separatorStyle = .singleLine
+    // Apply snapshot before any layout-triggering UIKit property changes.
     updateDataSource(animated: false, reloadingSections: [.History])
+    tableView.separatorStyle = .singleLine
     updateContentUnavailable()
   }
 
@@ -369,7 +377,7 @@ class SearchVC: BasicTableViewController {
       return
     }
     resolveDisplayedResults()
-    updateDataSource(animated: true, reloadingSections: [section])
+    updateDataSource(animated: false, reloadingSections: [section])
   }
 
   public func activateSearchBar() {
@@ -383,9 +391,34 @@ class SearchVC: BasicTableViewController {
     appDelegate.storage.main.library.deleteSearchHistory()
     appDelegate.storage.main.library.saveContext()
     searchHistory = []
-    // also hide the history header with the "Clear" button
-    updateDataSource(animated: true, reloadingSections: [.History])
+    // Non-animated: during animated deletes UITableView still asks for heights of
+    // vanishing rows, which would hit searchHistory[index] out of range on iOS 16.
+    updateDataSource(animated: false, reloadingSections: [.History])
     updateContentUnavailable()
+  }
+
+  private func searchHistoryItem(at index: Int) -> SearchHistoryItem? {
+    searchHistory.indices.contains(index) ? searchHistory[index] : nil
+  }
+
+  private func playlistAt(_ index: Int) -> Playlist? {
+    playlists.indices.contains(index) ? playlists[index] : nil
+  }
+
+  private func artistAt(_ index: Int) -> Artist? {
+    artists.indices.contains(index) ? artists[index] : nil
+  }
+
+  private func albumAt(_ index: Int) -> Album? {
+    albums.indices.contains(index) ? albums[index] : nil
+  }
+
+  private func featuredSongAt(_ index: Int) -> Song? {
+    featuredSongs.indices.contains(index) ? featuredSongs[index] : nil
+  }
+
+  private func songAt(_ index: Int) -> Song? {
+    songs.indices.contains(index) ? songs[index] : nil
   }
 
   func determSwipeActionContext(
@@ -394,8 +427,8 @@ class SearchVC: BasicTableViewController {
   ) {
     switch SearchSection(rawValue: indexPath.section) {
     case .History:
-      let history = searchHistory[indexPath.row]
-      guard let container = history.searchedPlayableContainable
+      guard let history = searchHistoryItem(at: indexPath.row),
+            let container = history.searchedPlayableContainable
       else { completionHandler(nil); return }
       Task { @MainActor in
         do {
@@ -411,7 +444,7 @@ class SearchVC: BasicTableViewController {
         completionHandler(SwipeActionContext(containable: container))
       }
     case .Playlist:
-      let playlist = playlists[indexPath.row]
+      guard let playlist = playlistAt(indexPath.row) else { completionHandler(nil); return }
       Task { @MainActor in
         do {
           try await playlist.fetch(
@@ -426,7 +459,7 @@ class SearchVC: BasicTableViewController {
         completionHandler(SwipeActionContext(containable: playlist))
       }
     case .Artist:
-      let artist = artists[indexPath.row]
+      guard let artist = artistAt(indexPath.row) else { completionHandler(nil); return }
       Task { @MainActor in
         do {
           try await artist.fetch(
@@ -441,7 +474,7 @@ class SearchVC: BasicTableViewController {
         completionHandler(SwipeActionContext(containable: artist))
       }
     case .Album:
-      let album = albums[indexPath.row]
+      guard let album = albumAt(indexPath.row) else { completionHandler(nil); return }
       Task { @MainActor in
         do {
           try await album.fetch(
@@ -456,10 +489,10 @@ class SearchVC: BasicTableViewController {
         completionHandler(SwipeActionContext(containable: album))
       }
     case .Featured:
-      let song = featuredSongs[indexPath.row]
+      guard let song = featuredSongAt(indexPath.row) else { completionHandler(nil); return }
       completionHandler(SwipeActionContext(containable: song))
     case .Song:
-      let song = songs[indexPath.row]
+      guard let song = songAt(indexPath.row) else { completionHandler(nil); return }
       completionHandler(SwipeActionContext(containable: song))
     case .none:
       completionHandler(nil)
@@ -469,14 +502,14 @@ class SearchVC: BasicTableViewController {
   func convertCellViewToPlayContext(cell: UITableViewCell) -> PlayContext? {
     guard let indexPath = tableView.indexPath(for: cell) else { return nil }
     if SearchSection(rawValue: indexPath.section) == .Song {
-      let song = songs[indexPath.row]
+      guard let song = songAt(indexPath.row) else { return nil }
       return PlayContext(containable: song)
     } else if SearchSection(rawValue: indexPath.section) == .Featured {
-      let song = featuredSongs[indexPath.row]
+      guard let song = featuredSongAt(indexPath.row) else { return nil }
       return PlayContext(containable: song)
     } else if SearchSection(rawValue: indexPath.section) == .History {
-      let history = searchHistory[indexPath.row]
-      guard let song = history.searchedPlayableContainable as? Song else { return nil }
+      guard let history = searchHistoryItem(at: indexPath.row),
+            let song = history.searchedPlayableContainable as? Song else { return nil }
       return PlayContext(containable: song)
     }
     return nil
@@ -491,7 +524,9 @@ class SearchVC: BasicTableViewController {
     -> UITableViewCell {
     switch SearchSection(rawValue: indexPath.section) {
     case .History:
-      let history = searchHistory[indexPath.row]
+      guard let history = searchHistoryItem(at: indexPath.row) else {
+        return UITableViewCell()
+      }
       guard let container = history.searchedPlayableContainable else {
         let cell = UITableViewCell(style: .default, reuseIdentifier: nil)
         cell.textLabel?.text = history.displayName
@@ -514,28 +549,28 @@ class SearchVC: BasicTableViewController {
         return cell
       }
     case .Playlist:
+      guard let playlist = playlistAt(indexPath.row) else { return UITableViewCell() }
       let cell: PlaylistTableCell = dequeueCell(for: tableView, at: indexPath)
-      let playlist = playlists[indexPath.row]
       cell.display(playlist: playlist, rootView: self)
       return cell
     case .Artist:
+      guard let artist = artistAt(indexPath.row) else { return UITableViewCell() }
       let cell: GenericTableCell = dequeueCell(for: tableView, at: indexPath)
-      let artist = artists[indexPath.row]
       cell.display(container: artist, rootView: self)
       return cell
     case .Album:
+      guard let album = albumAt(indexPath.row) else { return UITableViewCell() }
       let cell: GenericTableCell = dequeueCell(for: tableView, at: indexPath)
-      let album = albums[indexPath.row]
       cell.display(container: album, rootView: self)
       return cell
     case .Featured:
+      guard let song = featuredSongAt(indexPath.row) else { return UITableViewCell() }
       let cell: PlayableTableCell = dequeueCell(for: tableView, at: indexPath)
-      let song = featuredSongs[indexPath.row]
       cell.display(playable: song, playContextCb: convertCellViewToPlayContext, rootView: self)
       return cell
     case .Song:
+      guard let song = songAt(indexPath.row) else { return UITableViewCell() }
       let cell: PlayableTableCell = dequeueCell(for: tableView, at: indexPath)
-      let song = songs[indexPath.row]
       cell.display(playable: song, playContextCb: convertCellViewToPlayContext, rootView: self)
       return cell
     case .none:
@@ -650,8 +685,8 @@ class SearchVC: BasicTableViewController {
     -> CGFloat {
     switch SearchSection(rawValue: indexPath.section) {
     case .History:
-      let history = searchHistory[indexPath.row]
-      guard let container = history.searchedPlayableContainable else { return 0.0 }
+      guard let history = searchHistoryItem(at: indexPath.row),
+            let container = history.searchedPlayableContainable else { return 0.0 }
       if container is Playlist {
         return PlaylistTableCell.rowHeight
       } else if container is Song {
@@ -677,7 +712,7 @@ class SearchVC: BasicTableViewController {
   override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
     switch SearchSection(rawValue: indexPath.section) {
     case .History:
-      let history = searchHistory[indexPath.row]
+      guard let history = searchHistoryItem(at: indexPath.row) else { break }
       // Re-load to re-link snapshot-only items after sync brought entities back.
       searchHistory = appDelegate.storage.main.library.getSearchHistory(for: account)
       let refreshed = searchHistory.first { $0.managedObject.objectID == history.managedObject.objectID }
@@ -688,31 +723,31 @@ class SearchVC: BasicTableViewController {
         EntityPreviewActionBuilder(container: container, on: self).performPreviewTransition()
       }
     case .Playlist:
-      let playlist = playlists[indexPath.row]
+      guard let playlist = playlistAt(indexPath.row) else { break }
       let _ = appDelegate.storage.main.library.createOrUpdateSearchHistory(container: playlist)
       navigationController?.pushViewController(
         AppStoryboard.Main.segueToPlaylistDetail(account: account, playlist: playlist),
         animated: true
       )
     case .Artist:
-      let artist = artists[indexPath.row]
+      guard let artist = artistAt(indexPath.row) else { break }
       let _ = appDelegate.storage.main.library.createOrUpdateSearchHistory(container: artist)
       navigationController?.pushViewController(
         AppStoryboard.Main.segueToArtistDetail(account: account, artist: artist),
         animated: true
       )
     case .Album:
-      let album = albums[indexPath.row]
+      guard let album = albumAt(indexPath.row) else { break }
       let _ = appDelegate.storage.main.library.createOrUpdateSearchHistory(container: album)
       navigationController?.pushViewController(
         AppStoryboard.Main.segueToAlbumDetail(account: account, album: album),
         animated: true
       )
     case .Featured:
-      let song = featuredSongs[indexPath.row]
+      guard let song = featuredSongAt(indexPath.row) else { break }
       let _ = appDelegate.storage.main.library.createOrUpdateSearchHistory(container: song)
     case .Song:
-      let song = songs[indexPath.row]
+      guard let song = songAt(indexPath.row) else { break }
       let _ = appDelegate.storage.main.library.createOrUpdateSearchHistory(container: song)
     case .none: break
     }
@@ -760,8 +795,10 @@ class SearchVC: BasicTableViewController {
     allFeaturedSongsIDs = searchResult.featuredSongsIDs
     allSongsIDs = searchResult.songsIDs
     resolveDisplayedResults()
-    tableView.separatorStyle = .singleLine
+    // Snapshot first — separatorStyle / unavailable content can force layout against
+    // the previous snapshot while arrays already match the new results.
     updateDataSource(animated: false)
+    tableView.separatorStyle = .singleLine
     updateContentUnavailable()
   }
 
@@ -786,6 +823,9 @@ class SearchVC: BasicTableViewController {
 
   override func updateSearchResults(for searchController: UISearchController) {
     guard let searchText = searchController.searchBar.text, let accountObjectId else { return }
+    searchGeneration += 1
+    let generation = searchGeneration
+
     if !searchText.isEmpty, !searchController.searchBar.isCachedScopeSelected {
       Task { @MainActor in do {
         try await self.appDelegate.getMeta(self.account.info).librarySyncer
@@ -808,7 +848,8 @@ class SearchVC: BasicTableViewController {
         } catch {
           self.appDelegate.eventLogger.report(topic: "Songs Search", error: error)
         }
-        guard searchText == self.searchController.searchBar.text,
+        guard generation == self.searchGeneration,
+              searchText == self.searchController.searchBar.text,
               !self.searchController.searchBar.isCachedScopeSelected else { return }
         do {
           let refreshed = try await self.appDelegate.storage.async.performAndGet { asyncCompanion in
@@ -832,7 +873,8 @@ class SearchVC: BasicTableViewController {
             )
             return (featuredSongsIDs, songsIDs)
           }
-          guard searchText == self.searchController.searchBar.text,
+          guard generation == self.searchGeneration,
+                searchText == self.searchController.searchBar.text,
                 !self.searchController.searchBar.isCachedScopeSelected else { return }
           self.applyFeaturedAndSongsResult(
             featuredSongsIDs: refreshed.0,
@@ -897,7 +939,8 @@ class SearchVC: BasicTableViewController {
           return result
         }
 
-        guard searchText == self.searchController.searchBar.text else { return }
+        guard generation == self.searchGeneration,
+              searchText == self.searchController.searchBar.text else { return }
         self.applySearchResult(searchResult)
       } catch {
         // do nothing
@@ -957,7 +1000,8 @@ class SearchVC: BasicTableViewController {
           return result
         }
 
-        guard searchText == self.searchController.searchBar.text else { return }
+        guard generation == self.searchGeneration,
+              searchText == self.searchController.searchBar.text else { return }
         self.applySearchResult(searchResult)
       } catch {
         // do nothing
