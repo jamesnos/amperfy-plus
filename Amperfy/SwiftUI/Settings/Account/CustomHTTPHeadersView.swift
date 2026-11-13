@@ -102,7 +102,7 @@ struct CustomHTTPHeadersView: View {
         }
       }
     }
-    .onChange(of: entries) { _, _ in
+    .onChange(of: entries) { _ in
       commit()
     }
     .navigationTitle("Custom HTTP Headers")

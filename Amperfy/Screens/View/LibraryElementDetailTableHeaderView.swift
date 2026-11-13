@@ -64,12 +64,21 @@ class LibraryElementDetailTableHeaderView: UIView {
       right: UIView.defaultMarginX
     )
 
-    registerForTraitChanges(
-      [UITraitUserInterfaceStyle.self, UITraitHorizontalSizeClass.self],
-      handler: { (self: Self, previousTraitCollection: UITraitCollection) in
-        self.refresh()
-      }
-    )
+    if #available(iOS 17.0, *) {
+      registerForTraitChanges(
+        [UITraitUserInterfaceStyle.self, UITraitHorizontalSizeClass.self],
+        handler: { (self: Self, previousTraitCollection: UITraitCollection) in
+          self.refresh()
+        }
+      )
+    }
+  }
+
+  override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+    super.traitCollectionDidChange(previousTraitCollection)
+    if #unavailable(iOS 17.0) {
+      refresh()
+    }
   }
 
   public static func createTableHeader(
@@ -163,12 +172,14 @@ class LibraryElementDetailTableHeaderView: UIView {
     playShuffledButton.layer.cornerRadius = 10.0
     playShuffledButton.isHidden = configuration.isShuffleHidden
     activate()
-    registerForTraitChanges(
-      [UITraitUserInterfaceStyle.self, UITraitHorizontalSizeClass.self],
-      handler: { (self: Self, previousTraitCollection: UITraitCollection) in
-        self.refresh()
-      }
-    )
+    if #available(iOS 17.0, *) {
+      registerForTraitChanges(
+        [UITraitUserInterfaceStyle.self, UITraitHorizontalSizeClass.self],
+        handler: { (self: Self, previousTraitCollection: UITraitCollection) in
+          self.refresh()
+        }
+      )
+    }
   }
 
   func activate() {

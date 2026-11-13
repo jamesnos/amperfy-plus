@@ -103,19 +103,35 @@ class PlayerControlView: UIView {
       menuCreateCB: createPlayerOptionsMenu
     )
 
-    registerForTraitChanges(
-      [UITraitUserInterfaceStyle.self, UITraitHorizontalSizeClass.self],
-      handler: { (self: Self, previousTraitCollection: UITraitCollection) in
-        self.playerHandler?.refreshTimeInfo(
-          timeSlider: self.timeSlider,
-          elapsedTimeLabel: self.elapsedTimeLabel,
-          remainingTimeLabel: self.remainingTimeLabel,
-          audioInfoLabel: self.audioInfoLabel,
-          playTypeIcon: self.playTypeIcon,
-          liveLabel: self.liveLabel
-        )
-      }
-    )
+    if #available(iOS 17.0, *) {
+      registerForTraitChanges(
+        [UITraitUserInterfaceStyle.self, UITraitHorizontalSizeClass.self],
+        handler: { (self: Self, previousTraitCollection: UITraitCollection) in
+          self.playerHandler?.refreshTimeInfo(
+            timeSlider: self.timeSlider,
+            elapsedTimeLabel: self.elapsedTimeLabel,
+            remainingTimeLabel: self.remainingTimeLabel,
+            audioInfoLabel: self.audioInfoLabel,
+            playTypeIcon: self.playTypeIcon,
+            liveLabel: self.liveLabel
+          )
+        }
+      )
+    }
+  }
+
+  override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+    super.traitCollectionDidChange(previousTraitCollection)
+    if #unavailable(iOS 17.0) {
+      playerHandler?.refreshTimeInfo(
+        timeSlider: timeSlider,
+        elapsedTimeLabel: elapsedTimeLabel,
+        remainingTimeLabel: remainingTimeLabel,
+        audioInfoLabel: audioInfoLabel,
+        playTypeIcon: playTypeIcon,
+        liveLabel: liveLabel
+      )
+    }
   }
 
   @IBAction

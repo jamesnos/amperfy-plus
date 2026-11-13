@@ -104,23 +104,19 @@ class SongsVC: SingleFetchedResultsTableViewController<SongMO> {
   func updateContentUnavailable() {
     if fetchedResultsController.fetchedObjects?.count ?? 0 == 0 {
       if fetchedResultsController.isSearchActive {
-        contentUnavailableConfiguration = UIContentUnavailableConfiguration.search()
+        setAmperfyUnavailableContent(.search())
       } else {
-        contentUnavailableConfiguration = emptyContentConfig
+        setAmperfyUnavailableContent(emptyContentConfig)
       }
       detailHeaderView?.isHidden = true
     } else {
-      contentUnavailableConfiguration = nil
+      setAmperfyUnavailableContent(nil)
       detailHeaderView?.isHidden = false
     }
   }
 
-  lazy var emptyContentConfig: UIContentUnavailableConfiguration = {
-    var config = UIContentUnavailableConfiguration.empty()
-    config.image = .musicalNotes
-    config.text = "No Songs"
-    config.secondaryText = "Your songs will appear here."
-    return config
+  lazy var emptyContentConfig: AmperfyUnavailableContent = {
+    .empty(image: .musicalNotes, text: "No Songs", secondaryText: "Your songs will appear here.")
   }()
 
   func applyFilter() {

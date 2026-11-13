@@ -220,15 +220,14 @@ struct PlaylistGeneratorView: View {
           .listRowSpacing(0)
           .environment(\.editMode, .constant(.active))
           .environment(\.defaultMinListRowHeight, MatchTableLayout.rowHeight)
-          .contentMargins(.top, 0, for: .scrollContent)
-          .contentMargins(.bottom, 0, for: .scrollContent)
+          .modifier(ScrollContentMarginsZeroModifier())
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
       }
     }
     .navigationTitle("Playlist Generator")
     .onAppear { syncToolbar() }
-    .onChange(of: toolbarState) { _, _ in syncToolbar() }
+    .onChange(of: toolbarState) { _ in syncToolbar() }
     .sheet(isPresented: Binding(
       get: { model.reviewingRowID != nil },
       set: { if !$0 { model.closeReview() } }
@@ -723,7 +722,7 @@ private struct PlaylistMatchPickerSheet: View {
           .frame(width: 520, height: 160)
       }
     }
-    .presentationSizing(.fitted)
+    .modifier(FittedPresentationModifier())
     .presentationDragIndicator(.hidden)
   }
 
@@ -810,24 +809,19 @@ private struct PlaylistMatchPickerSheet: View {
     .padding(20)
     .frame(width: 520)
     .onAppear { prepare(row) }
-    .onChange(of: query) { _, newValue in
+    .onChange(of: query) { newValue in
       model.updateManualQuery(newValue, for: row.id)
       guard newValue != seed else { return }
       scheduleSearch(for: row.id)
     }
-    .onKeyPress(.upArrow) {
-      moveSelection(-1, in: results)
-      return .handled
-    }
-    .onKeyPress(.downArrow) {
-      moveSelection(1, in: results)
-      return .handled
-    }
-    .onKeyPress(.return) {
-      guard !searchFocused else { return .ignored }
-      confirm(row)
-      return .handled
-    }
+    .modifier(PlaylistMatchKeyPressModifier(
+      onUp: { moveSelection(-1, in: results) },
+      onDown: { moveSelection(1, in: results) },
+      onReturn: {
+        guard !searchFocused else { return }
+        confirm(row)
+      }
+    ))
     .onDisappear { searchTask?.cancel() }
   }
 
@@ -1045,7 +1039,7 @@ private struct PlaylistNameSheet: View {
     .padding(20)
     .frame(width: 380)
     .fixedSize(horizontal: false, vertical: true)
-    .presentationSizing(.fitted)
+    .modifier(FittedPresentationModifier())
     .presentationDragIndicator(.hidden)
     .onAppear { nameFocused = true }
   }
@@ -1152,5 +1146,56 @@ private final class FixedArtworkView: UIView {
 
   override func sizeThatFits(_ size: CGSize) -> CGSize {
     intrinsicContentSize
+  }
+}
+
+// MARK: - iOS 16 compatibility helpers
+
+private struct ScrollContentMarginsZeroModifier: ViewModifier {
+  func body(content: Content) -> some View {
+    if #available(iOS 17.0, *) {
+      content
+        .contentMargins(.top, 0, for: .scrollContent)
+        .contentMargins(.bottom, 0, for: .scrollContent)
+    } else {
+      content
+    }
+  }
+}
+
+private struct PlaylistMatchKeyPressModifier: ViewModifier {
+  let onUp: () -> Void
+  let onDown: () -> Void
+  let onReturn: () -> Void
+
+  func body(content: Content) -> some View {
+    if #available(iOS 17.0, *) {
+      content
+        .onKeyPress(.upArrow) {
+          onUp()
+          return .handled
+        }
+        .onKeyPress(.downArrow) {
+          onDown()
+          return .handled
+        }
+        .onKeyPress(.return) {
+          onReturn()
+          return .handled
+        }
+    } else {
+      content
+    }
+  }
+}
+
+
+private struct FittedPresentationModifier: ViewModifier {
+  func body(content: Content) -> some View {
+    if #available(iOS 18.0, *) {
+      content.presentationSizing(.fitted)
+    } else {
+      content
+    }
   }
 }

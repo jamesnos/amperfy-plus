@@ -26,6 +26,7 @@ import UIKit
 
 // MARK: - OpenAppWithConfigurationIntent
 
+@available(iOS 26.0, *)
 struct OpenAppWithConfigurationIntent: AppIntent {
   static let intentClassName = "OpenAppWithConfigurationIntent"
   static let title: LocalizedStringResource = "Open With Configuration"

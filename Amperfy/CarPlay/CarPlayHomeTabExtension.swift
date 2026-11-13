@@ -33,11 +33,16 @@ extension CarPlaySceneDelegate {
       requestedData else {
       return
     }
-    let homeRows = createHomeImageRows()
-    let homeSection = CPListSection(items: homeRows, header: nil, sectionIndexTitle: nil)
-    homeTab.updateSections([homeSection])
+    if #available(iOS 26.0, *) {
+      let homeRows = createHomeImageRows()
+      let homeSection = CPListSection(items: homeRows, header: nil, sectionIndexTitle: nil)
+      homeTab.updateSections([homeSection])
+    } else {
+      homeTab.updateSections([])
+    }
   }
 
+  @available(iOS 26.0, *)
   func createHomeImageRows() -> [CPListImageRowItem] {
     guard let sharedHome else { return [] }
     var imageRows = [CPListImageRowItem]()
@@ -59,6 +64,7 @@ extension CarPlaySceneDelegate {
     return imageRows
   }
 
+  @available(iOS 26.0, *)
   func createHomeRow(section: HomeSection, isDetailTemplate: Bool) -> CPListImageRowItem? {
     guard let sharedHome else { return nil }
     let alreadyCreatedData = homeRowData[section]
@@ -163,6 +169,7 @@ extension CarPlaySceneDelegate {
     return row
   }
 
+  @available(iOS 26.0, *)
   func createHomeRowImageElements(
     section: HomeSection,
     isDetail: Bool
@@ -180,8 +187,10 @@ extension CarPlaySceneDelegate {
     if !isDetail {
       homeRowData[section] = requestedData
     } else {
-      for var container in homeArtworkUpdate {
-        container.value.detailRow.removeAll()
+      for (key, value) in homeArtworkUpdate {
+        guard var container = value as? EntityImageRowContainer else { continue }
+        container.detailRow.removeAll()
+        homeArtworkUpdate[key] = container
       }
     }
 
@@ -227,10 +236,13 @@ extension CarPlaySceneDelegate {
             homeRow: isDetail ? [] : [element],
             detailRow: isDetail ? [element] : []
           )
-        } else if isDetail {
-          homeArtworkUpdate[artwork.uniqueID]?.detailRow.append(element)
-        } else {
-          homeArtworkUpdate[artwork.uniqueID]?.homeRow.append(element)
+        } else if var container = homeArtworkUpdate[artwork.uniqueID] as? EntityImageRowContainer {
+          if isDetail {
+            container.detailRow.append(element)
+          } else {
+            container.homeRow.append(element)
+          }
+          homeArtworkUpdate[artwork.uniqueID] = container
         }
       }
       imageRowElements.append(element)

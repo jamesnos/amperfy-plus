@@ -120,40 +120,32 @@ class PodcastsVC: MultiSourceTableViewController {
     case .podcasts:
       if podcastsFetchedResultsController.fetchedObjects?.count ?? 0 == 0 {
         if podcastsFetchedResultsController.isSearchActive {
-          contentUnavailableConfiguration = UIContentUnavailableConfiguration.search()
+          setAmperfyUnavailableContent(.search())
         } else {
-          contentUnavailableConfiguration = emptyPodcastConfig
+          setAmperfyUnavailableContent(emptyPodcastConfig)
         }
       } else {
-        contentUnavailableConfiguration = nil
+        setAmperfyUnavailableContent(nil)
       }
     case .episodesSortedByReleaseDate:
       if episodesFetchedResultsController.fetchedObjects?.count ?? 0 == 0 {
         if episodesFetchedResultsController.isSearchActive {
-          contentUnavailableConfiguration = UIContentUnavailableConfiguration.search()
+          setAmperfyUnavailableContent(.search())
         } else {
-          contentUnavailableConfiguration = emptyEpisodeConfig
+          setAmperfyUnavailableContent(emptyEpisodeConfig)
         }
       } else {
-        contentUnavailableConfiguration = nil
+        setAmperfyUnavailableContent(nil)
       }
     }
   }
 
-  lazy var emptyPodcastConfig: UIContentUnavailableConfiguration = {
-    var config = UIContentUnavailableConfiguration.empty()
-    config.image = .podcast
-    config.text = "No Podcasts"
-    config.secondaryText = "Your podcasts will appear here."
-    return config
+  lazy var emptyPodcastConfig: AmperfyUnavailableContent = {
+    .empty(image: .podcast, text: "No Podcasts", secondaryText: "Your podcasts will appear here.")
   }()
 
-  lazy var emptyEpisodeConfig: UIContentUnavailableConfiguration = {
-    var config = UIContentUnavailableConfiguration.empty()
-    config.image = .podcastEpisode
-    config.text = "No Podcast Episodes"
-    config.secondaryText = "Your podcast episodes will appear here."
-    return config
+  lazy var emptyEpisodeConfig: AmperfyUnavailableContent = {
+    .empty(image: .podcastEpisode, text: "No Podcast Episodes", secondaryText: "Your podcast episodes will appear here.")
   }()
 
   override func viewWillAppear(_ animated: Bool) {

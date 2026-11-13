@@ -55,11 +55,20 @@ class CommonCollectionSectionHeader: UICollectionReusableView {
     detailHeader?.isHidden = true
     detailHeader = nil
 
-    registerForTraitChanges(
-      [UITraitUserInterfaceStyle.self, UITraitHorizontalSizeClass.self],
-      handler: { (self: Self, previousTraitCollection: UITraitCollection) in
-        self.detailHeader?.refresh()
-      }
-    )
+    if #available(iOS 17.0, *) {
+      registerForTraitChanges(
+        [UITraitUserInterfaceStyle.self, UITraitHorizontalSizeClass.self],
+        handler: { (self: Self, previousTraitCollection: UITraitCollection) in
+          self.detailHeader?.refresh()
+        }
+      )
+    }
+  }
+
+  override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+    super.traitCollectionDidChange(previousTraitCollection)
+    if #unavailable(iOS 17.0) {
+      detailHeader?.refresh()
+    }
   }
 }

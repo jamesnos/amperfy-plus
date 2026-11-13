@@ -34,8 +34,7 @@ enum PlayPausePlaybackAppEnum: Int, AppEnum {
     .pause: DisplayRepresentation(title: "Pause", image: .init(systemName: "pause.fill")),
     .toggle: DisplayRepresentation(
       title: "Play/Pause",
-      image: .init(systemName: "playpause.fill"),
-      synonyms: ["toggle"]
+      image: .init(systemName: "playpause.fill")
     ),
   ]
 }

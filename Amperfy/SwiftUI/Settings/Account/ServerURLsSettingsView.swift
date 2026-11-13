@@ -109,7 +109,7 @@ struct ServerURLsSettingsView: View {
           deleteURL(url: serverURLs[index])
           serverURLs.remove(atOffsets: indexSet)
         }
-        .onChange(of: selection) { oldSelection, newSelection in
+        .onChange(of: selection) { _ in
           selection = nil
         }
         .settingsRowBackground()

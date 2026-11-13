@@ -409,7 +409,9 @@ class PlayerUIHandler: NSObject {
     liveLabel: UILabel
   ) {
     timeSlider.preferredBehavioralStyle = .pad
-    timeSlider.sliderStyle = .thumbless
+    if #available(iOS 26.0, *) {
+      timeSlider.sliderStyle = .thumbless
+    }
     if let currentlyPlaying = player.currentlyPlaying {
       let supportTimeInteraction = !currentlyPlaying.isRadio
       timeSlider.isEnabled = supportTimeInteraction && (style != .miniPlayeriOS)

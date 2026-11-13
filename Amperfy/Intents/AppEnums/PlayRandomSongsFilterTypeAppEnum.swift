@@ -32,8 +32,7 @@ enum PlayRandomSongsFilterTypeAppEnum: Int, AppEnum {
     .all: DisplayRepresentation(title: "All", image: .init(systemName: "circle.circle")),
     .cache: DisplayRepresentation(
       title: "Cached only",
-      image: .init(systemName: "arrow.down.circle"),
-      synonyms: ["cached", "cache", "downloaded"]
+      image: .init(systemName: "arrow.down.circle")
     ),
   ]
 }

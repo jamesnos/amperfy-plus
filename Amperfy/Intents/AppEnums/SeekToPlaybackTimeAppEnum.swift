@@ -22,6 +22,7 @@
 import AppIntents
 import Foundation
 
+@available(iOS 16.0, macOS 13.0, watchOS 9.0, tvOS 16.0, *)
 enum SeekToPlaybackTimeAppEnum: Int, AppEnum {
   case forward
   case backward
@@ -31,18 +32,15 @@ enum SeekToPlaybackTimeAppEnum: Int, AppEnum {
   static let caseDisplayRepresentations: [Self: DisplayRepresentation] = [
     .toTime: DisplayRepresentation(
       title: "To time",
-      image: .init(systemName: "clock"),
-      synonyms: ["time"]
+      image: .init(systemName: "clock")
     ),
     .forward: DisplayRepresentation(
       title: "Forward by",
-      image: .init(systemName: "arrow.trianglehead.clockwise"),
-      synonyms: ["forward"]
+      image: .init(systemName: "arrow.trianglehead.clockwise")
     ),
     .backward: DisplayRepresentation(
       title: "Backward by",
-      image: .init(systemName: "arrow.trianglehead.counterclockwise"),
-      synonyms: ["backward"]
+      image: .init(systemName: "arrow.trianglehead.counterclockwise")
     ),
   ]
 }

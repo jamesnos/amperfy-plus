@@ -188,7 +188,11 @@ class LibraryNavigatorConfigurator: NSObject {
   private func editingPressed() {
     let isInEditMode = !collectionView.isEditing
     editButton.title = isInEditMode ? "Done" : "Edit"
-    editButton.style = isInEditMode ? .prominent : .plain
+    if #available(iOS 26.0, *) {
+      editButton.style = isInEditMode ? .prominent : .plain
+    } else {
+      editButton.style = isInEditMode ? .done : .plain
+    }
 
     if isInEditMode {
       #if targetEnvironment(macCatalyst) // ok

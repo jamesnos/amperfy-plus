@@ -215,21 +215,21 @@ class ArtistsVC: SingleSnapshotFetchedResultsTableViewController<ArtistMO> {
   func updateContentUnavailable() {
     if fetchedResultsController.fetchedObjects?.count ?? 0 == 0 {
       if fetchedResultsController.isSearchActive {
-        contentUnavailableConfiguration = UIContentUnavailableConfiguration.search()
+        setAmperfyUnavailableContent(.search())
       } else {
-        contentUnavailableConfiguration = emptyContentConfig
+        setAmperfyUnavailableContent(emptyContentConfig)
       }
     } else {
-      contentUnavailableConfiguration = nil
+      setAmperfyUnavailableContent(nil)
     }
   }
 
-  lazy var emptyContentConfig: UIContentUnavailableConfiguration = {
-    var config = UIContentUnavailableConfiguration.empty()
-    config.image = .artist
-    config.text = "No " + filterTitle
-    config.secondaryText = "Your " + filterTitle.lowercased() + " will appear here."
-    return config
+  lazy var emptyContentConfig: AmperfyUnavailableContent = {
+    .empty(
+      image: .artist,
+      text: "No " + filterTitle,
+      secondaryText: "Your " + filterTitle.lowercased() + " will appear here."
+    )
   }()
 
   func applyFilter() {

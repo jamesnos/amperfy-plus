@@ -121,15 +121,19 @@ class QueueVC: UIViewController {
       contextNextQueueSectionHeader = sectionView
     }
 
-    if #available(macCatalyst 27.0, *) {
-      // Empty navigation bar that looks like the section headers: no system edge effect and a
-      // transparent navigation bar. Its background is drawn by a fake navigation bar instead.
-      self.tableView!.topEdgeEffect.isHidden = true
-      configureTransparentNavigationBar()
-      addFakeNavigationBar()
+    if #available(iOS 26.0, *) {
+      if #available(macCatalyst 27.0, *) {
+        // Empty navigation bar that looks like the section headers: no system edge effect and a
+        // transparent navigation bar. Its background is drawn by a fake navigation bar instead.
+        self.tableView!.topEdgeEffect.isHidden = true
+        configureTransparentNavigationBar()
+        addFakeNavigationBar()
+      } else {
+        // hard top border -> other glass effect is to big and covers top sidebar elements
+        self.tableView!.topEdgeEffect.style = .hard
+        navigationController?.navigationBar.isTranslucent = false
+      }
     } else {
-      // hard top border -> other glass effect is to big and covers top sidebar elements
-      self.tableView!.topEdgeEffect.style = .hard
       navigationController?.navigationBar.isTranslucent = false
     }
 
@@ -182,10 +186,17 @@ class QueueVC: UIViewController {
   }
 
   override var traitCollection: UITraitCollection {
-    super.traitCollection.modifyingTraits { traits in
-      traits.horizontalSizeClass = .compact
-      traits.verticalSizeClass = .compact
+    if #available(iOS 17.0, *) {
+      return super.traitCollection.modifyingTraits { traits in
+        traits.horizontalSizeClass = .compact
+        traits.verticalSizeClass = .compact
+      }
     }
+    return UITraitCollection(traitsFrom: [
+      super.traitCollection,
+      UITraitCollection(horizontalSizeClass: .compact),
+      UITraitCollection(verticalSizeClass: .compact),
+    ])
   }
 }
 

@@ -124,12 +124,21 @@ class GenericDetailTableHeader: UIView {
       descriptionLabel.isHidden = true
     }
     refresh()
-    registerForTraitChanges(
-      [UITraitUserInterfaceStyle.self, UITraitHorizontalSizeClass.self],
-      handler: { (self: Self, previousTraitCollection: UITraitCollection) in
-        self.applyTraitCollectionChange()
-      }
-    )
+    if #available(iOS 17.0, *) {
+      registerForTraitChanges(
+        [UITraitUserInterfaceStyle.self, UITraitHorizontalSizeClass.self],
+        handler: { (self: Self, previousTraitCollection: UITraitCollection) in
+          self.applyTraitCollectionChange()
+        }
+      )
+    }
+  }
+
+  override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+    super.traitCollectionDidChange(previousTraitCollection)
+    if #unavailable(iOS 17.0) {
+      applyTraitCollectionChange()
+    }
   }
 
   func refresh() {

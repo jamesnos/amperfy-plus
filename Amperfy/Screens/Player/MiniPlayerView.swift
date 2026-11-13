@@ -246,9 +246,7 @@ class MiniPlayerView: UIView {
     config.image = .repeatMenu.withConfiguration(UIImage.SymbolConfiguration(scale: .medium))
     let button = UIButton(configuration: config)
     button.addTarget(self, action: #selector(Self.repeatButtonPushed), for: .touchUpInside)
-    button
-      .cornerConfiguration =
-      .corners(radius: UICornerRadius(floatLiteral: Self.mediumButtonSize / 2))
+    Self.applyRoundCorners(to: button, radius: Self.mediumButtonSize / 2)
     return button
   }()
 
@@ -263,9 +261,7 @@ class MiniPlayerView: UIView {
     config.image = .shuffle.withConfiguration(UIImage.SymbolConfiguration(scale: .medium))
     let button = UIButton(configuration: config)
     button.addTarget(self, action: #selector(Self.shuffleButtonPushed), for: .touchUpInside)
-    button
-      .cornerConfiguration =
-      .corners(radius: UICornerRadius(floatLiteral: Self.mediumButtonSize / 2))
+    Self.applyRoundCorners(to: button, radius: Self.mediumButtonSize / 2)
     return button
   }()
 
@@ -544,26 +540,42 @@ class MiniPlayerView: UIView {
 
     player.addNotifier(notifier: self)
 
-    registerForTraitChanges(
-      [UITraitUserInterfaceStyle.self, UITraitHorizontalSizeClass.self],
-      handler: { (self: Self, previousTraitCollection: UITraitCollection) in
-        self.refreshPlayer()
+    if #available(iOS 17.0, *) {
+      registerForTraitChanges(
+        [UITraitUserInterfaceStyle.self, UITraitHorizontalSizeClass.self],
+        handler: { (self: Self, previousTraitCollection: UITraitCollection) in
+          self.refreshPlayer()
+        }
+      )
+    }
+    if #available(iOS 26.0, *) {
+      registerForTraitChanges([UITraitTabAccessoryEnvironment.self]) { (
+        self: Self,
+        previousTraitCollection: UITraitCollection
+      ) in
+        self.refreshForTabAccessoryTraitChange()
+        self.tabAccessoryTraitChangeCB?()
       }
-    )
-
-    registerForTraitChanges([UITraitTabAccessoryEnvironment.self]) { (
-      self: Self,
-      previousTraitCollection: UITraitCollection
-    ) in
-      self.refreshForTabAccessoryTraitChange()
-      self.tabAccessoryTraitChangeCB?()
     }
   }
 
   public var tabAccessoryTraitChangeCB: VoidFunctionCallback?
 
+  override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+    super.traitCollectionDidChange(previousTraitCollection)
+    if #unavailable(iOS 17.0) {
+      if previousTraitCollection?.horizontalSizeClass != traitCollection.horizontalSizeClass ||
+        previousTraitCollection?.hasDifferentColorAppearance(comparedTo: traitCollection) == true {
+        refreshPlayer()
+      }
+    }
+  }
+
   private func refreshForTabAccessoryTraitChange() {
-    let isInline = traitCollection.tabAccessoryEnvironment == .inline
+    var isInline = false
+    if #available(iOS 26.0, *) {
+      isInline = traitCollection.tabAccessoryEnvironment == .inline
+    }
     playButtonTrailingConstraint?.isActive = false
     if isInline {
       nextButton.isHidden = true
@@ -579,6 +591,15 @@ class MiniPlayerView: UIView {
       )
     }
     playButtonTrailingConstraint?.isActive = true
+  }
+
+  private static func applyRoundCorners(to view: UIView, radius: CGFloat) {
+    if #available(iOS 26.0, *) {
+      view.cornerConfiguration = .corners(radius: UICornerRadius(floatLiteral: radius))
+    } else {
+      view.layer.cornerRadius = radius
+      view.clipsToBounds = true
+    }
   }
 
   public func configureForMac() {
@@ -864,9 +885,15 @@ class MiniPlayerView: UIView {
 
   public lazy var glassContainer: UIVisualEffectView = {
     let container = UIVisualEffectView()
-    let glassEffect = UIGlassEffect(style: .regular)
-    glassEffect.isInteractive = false
-    container.effect = glassEffect
+    if #available(iOS 26.0, *) {
+      let glassEffect = UIGlassEffect(style: .regular)
+      glassEffect.isInteractive = false
+      container.effect = glassEffect
+    } else {
+      container.effect = UIBlurEffect(style: .systemChromeMaterial)
+      container.layer.cornerRadius = 14
+      container.clipsToBounds = true
+    }
     container.contentView.addSubview(self)
 
     container.translatesAutoresizingMaskIntoConstraints = false

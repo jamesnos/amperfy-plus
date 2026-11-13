@@ -25,9 +25,35 @@ import UIKit
 // MARK: - TabBarVC
 
 class TabBarVC: UITabBarController {
-  private var libraryGroup: UITabGroup?
-  private var searchTab: UISearchTab?
-  private var homeTab: UITab?
+  @available(iOS 18.0, *)
+  private var libraryGroup: UITabGroup? {
+    get { _libraryGroup as? UITabGroup }
+    set { _libraryGroup = newValue }
+  }
+
+  @available(iOS 18.0, *)
+  private var searchTab: UISearchTab? {
+    get { _searchTab as? UISearchTab }
+    set { _searchTab = newValue }
+  }
+
+  @available(iOS 18.0, *)
+  private var homeTab: UITab? {
+    get { _homeTab as? UITab }
+    set { _homeTab = newValue }
+  }
+
+  /// Type-erased storage so the class can compile against iOS 16.
+  private var _libraryGroup: AnyObject?
+  private var _searchTab: AnyObject?
+  private var _homeTab: AnyObject?
+
+  private var classicSearchNav: UINavigationController?
+  private var classicHomeNav: UINavigationController?
+  private var classicLibraryNav: UINavigationController?
+  private var classicMiniPlayerBottomConstraint: NSLayoutConstraint?
+  private var usesClassicTabs = false
+
   private let account: Account
 
   init(account: Account) {
@@ -44,18 +70,68 @@ class TabBarVC: UITabBarController {
 
   override func viewDidLoad() {
     super.viewDidLoad()
+    delegate = self
+
+    if #available(iOS 18.0, *) {
+      setupModernTabs()
+    } else {
+      setupClassicTabs()
+    }
+
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleLibraryItemsChanged(notification:)),
+      name: .LibraryItemsChanged,
+      object: nil
+    )
+
+    miniPlayer = MiniPlayerView(player: appDelegate.player)
+    miniPlayer!.configureForiOS()
+    miniPlayer!.glassContainer.translatesAutoresizingMaskIntoConstraints = false
+
+    if #available(iOS 26.0, *) {
+      #if !targetEnvironment(macCatalyst)
+        tabBarMinimizeBehavior = .onScrollDown
+      #endif
+      let accessory = UITabAccessory(contentView: miniPlayer!.glassContainer)
+      bottomAccessory = accessory
+    } else {
+      installClassicMiniPlayer()
+    }
+
+    heightConstraint = miniPlayer!.glassContainer.heightAnchor.constraint(equalToConstant: 48.0)
+    heightConstraint?.isActive = true
+    if miniPlayer!.glassContainer.superview != nil {
+      compactWidthConstraint = miniPlayer!.glassContainer.widthAnchor
+        .constraint(equalTo: miniPlayer!.glassContainer.superview!.widthAnchor)
+    }
+
+    miniPlayer!.tabAccessoryTraitChangeCB = configureTraitChangesForMiniPlayer
+    configureTraitChangesForMiniPlayer()
+    registerMiniPlayerTraitObservers()
+
+    if appDelegate.storage.settings.user.isOfflineMode {
+      appDelegate.eventLogger.info(topic: "Reminder", message: "Offline Mode is active.")
+    }
+  }
+
+  @available(iOS 18.0, *)
+  private func setupModernTabs() {
     var fixTabs = [UITab]()
 
-    searchTab = UISearchTab { _ in
+    let search = UISearchTab { _ in
       UINavigationController(
         rootViewController: TabNavigatorItem.search
           .getController(account: self.account)
       )
     }
-    searchTab!.automaticallyActivatesSearch = true
-    fixTabs.append(searchTab!)
+    if #available(iOS 26.0, *) {
+      search.automaticallyActivatesSearch = true
+    }
+    searchTab = search
+    fixTabs.append(search)
 
-    homeTab = UITab(
+    let home = UITab(
       title: TabNavigatorItem.home.title,
       image: TabNavigatorItem.home.icon,
       identifier: "Tabs.\(TabNavigatorItem.home.title)"
@@ -65,9 +141,9 @@ class TabBarVC: UITabBarController {
           .getController(account: self.account)
       )
     }
-    fixTabs.append(homeTab!)
+    homeTab = home
+    fixTabs.append(home)
 
-    // all library tabs in the order arranged by the user, the ones not in use are hidden
     let librarySettings = appDelegate.storage.settings.accounts
       .getSetting(account.info).read
       .libraryDisplaySettings
@@ -85,7 +161,7 @@ class TabBarVC: UITabBarController {
         return tab
       }
 
-    libraryGroup = UITabGroup(
+    let group = UITabGroup(
       title: "Library",
       image: .musicLibrary,
       identifier: "Tabs.Library",
@@ -93,54 +169,100 @@ class TabBarVC: UITabBarController {
     ) { tab in
       AppStoryboard.Main.segueToLibrary(account: self.account)
     }
-    libraryGroup!.managingNavigationController = UINavigationController()
-    libraryGroup!.allowsReordering = true
-    fixTabs.append(libraryGroup!)
+    group.managingNavigationController = UINavigationController()
+    group.allowsReordering = true
+    libraryGroup = group
+    fixTabs.append(group)
 
-    delegate = self
     tabs = fixTabs
+  }
 
-    NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(handleLibraryItemsChanged(notification:)),
-      name: .LibraryItemsChanged,
-      object: nil
+  private func setupClassicTabs() {
+    usesClassicTabs = true
+
+    let searchRoot = TabNavigatorItem.search.getController(account: account)
+    let searchNav = UINavigationController(rootViewController: searchRoot)
+    searchNav.tabBarItem = UITabBarItem(
+      title: TabNavigatorItem.search.title,
+      image: TabNavigatorItem.search.icon,
+      selectedImage: nil
     )
+    classicSearchNav = searchNav
 
-    tabBarMinimizeBehavior = .onScrollDown
+    let homeRoot = TabNavigatorItem.home.getController(account: account)
+    let homeNav = UINavigationController(rootViewController: homeRoot)
+    homeNav.tabBarItem = UITabBarItem(
+      title: TabNavigatorItem.home.title,
+      image: TabNavigatorItem.home.icon,
+      selectedImage: nil
+    )
+    classicHomeNav = homeNav
 
-    miniPlayer = MiniPlayerView(player: appDelegate.player)
-    miniPlayer!.configureForiOS()
-    miniPlayer!.glassContainer.translatesAutoresizingMaskIntoConstraints = false
+    let libraryRoot = AppStoryboard.Main.segueToLibrary(account: account)
+    let libraryNav = UINavigationController(rootViewController: libraryRoot)
+    libraryNav.tabBarItem = UITabBarItem(
+      title: "Library",
+      image: .musicLibrary,
+      selectedImage: nil
+    )
+    classicLibraryNav = libraryNav
 
-    let accessory = UITabAccessory(contentView: miniPlayer!.glassContainer)
-    bottomAccessory = accessory
+    viewControllers = [searchNav, homeNav, libraryNav]
+  }
 
-    heightConstraint = miniPlayer!.glassContainer.heightAnchor.constraint(equalToConstant: 48.0)
-    heightConstraint?.isActive = true
-    compactWidthConstraint = miniPlayer!.glassContainer.widthAnchor
-      .constraint(equalTo: miniPlayer!.glassContainer.superview!.widthAnchor)
+  private func installClassicMiniPlayer() {
+    guard let miniPlayer else { return }
+    let container = miniPlayer.glassContainer
+    view.addSubview(container)
+    container.translatesAutoresizingMaskIntoConstraints = false
 
-    miniPlayer!.tabAccessoryTraitChangeCB = configureTraitChangesForMiniPlayer
-    configureTraitChangesForMiniPlayer()
+    let bottom = container.bottomAnchor.constraint(
+      equalTo: tabBar.topAnchor,
+      constant: -8
+    )
+    classicMiniPlayerBottomConstraint = bottom
+    NSLayoutConstraint.activate([
+      container.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
+      container.trailingAnchor.constraint(
+        equalTo: view.safeAreaLayoutGuide.trailingAnchor,
+        constant: -12
+      ),
+      bottom,
+    ])
+    applyClassicMiniPlayerInsets()
+  }
 
-    registerForTraitChanges(
-      [UITraitUserInterfaceStyle.self, UITraitHorizontalSizeClass.self],
-      handler: { (self: Self, previousTraitCollection: UITraitCollection) in
-        self.miniPlayer?
-          .refreshForTraitChange(horizontalSizeClass: self.traitCollection.horizontalSizeClass)
-        self.configureTraitChangesForMiniPlayer()
+  private func applyClassicMiniPlayerInsets() {
+    let height = heightConstraint?.constant ?? 48
+    additionalSafeAreaInsets.bottom = height + 16
+  }
+
+  private func registerMiniPlayerTraitObservers() {
+    if #available(iOS 17.0, *) {
+      registerForTraitChanges(
+        [UITraitUserInterfaceStyle.self, UITraitHorizontalSizeClass.self],
+        handler: { (self: Self, previousTraitCollection: UITraitCollection) in
+          self.miniPlayer?
+            .refreshForTraitChange(horizontalSizeClass: self.traitCollection.horizontalSizeClass)
+          self.configureTraitChangesForMiniPlayer()
+        }
+      )
+    }
+  }
+
+  override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+    super.traitCollectionDidChange(previousTraitCollection)
+    if #unavailable(iOS 17.0) {
+      if previousTraitCollection?.horizontalSizeClass != traitCollection.horizontalSizeClass ||
+        previousTraitCollection?.hasDifferentColorAppearance(comparedTo: traitCollection) == true {
+        miniPlayer?
+          .refreshForTraitChange(horizontalSizeClass: traitCollection.horizontalSizeClass)
+        configureTraitChangesForMiniPlayer()
       }
-    )
-
-    if appDelegate.storage.settings.user.isOfflineMode {
-      appDelegate.eventLogger.info(topic: "Reminder", message: "Offline Mode is active.")
     }
   }
 
   private func mainContent() -> UIView {
-    // Attempt to find the main content view controller's view if the sidebar is visible.
-    // Fallback to self.view.safeAreaLayoutGuide.leadingAnchor otherwise.
     if traitCollection.horizontalSizeClass == .regular, let selectedViewController {
       return selectedViewController.view
     }
@@ -154,7 +276,18 @@ class TabBarVC: UITabBarController {
 
   func configureTraitChangesForMiniPlayer() {
     guard let miniPlayer else { return }
-    let isInline = miniPlayer.glassContainer.traitCollection.tabAccessoryEnvironment == .inline
+
+    if #available(iOS 26.0, *) {
+      let isInline = miniPlayer.glassContainer.traitCollection.tabAccessoryEnvironment == .inline
+      applyMiniPlayerLayout(isInline: isInline)
+    } else {
+      applyMiniPlayerLayout(isInline: false)
+      applyClassicMiniPlayerInsets()
+    }
+  }
+
+  private func applyMiniPlayerLayout(isInline: Bool) {
+    guard let miniPlayer else { return }
 
     if traitCollection.horizontalSizeClass == .regular {
       centerConstraint = miniPlayer.glassContainer.safeAreaLayoutGuide.centerXAnchor.constraint(
@@ -167,10 +300,12 @@ class TabBarVC: UITabBarController {
       playerWidth = min(playerWidth, 600)
       compactWidthConstraint?.isActive = false
       regularWidthConstraint?.isActive = false
-      regularWidthConstraint = miniPlayer.glassContainer.widthAnchor
-        .constraint(equalToConstant: playerWidth)
-      regularWidthConstraint?.isActive = true
-      centerConstraint?.isActive = true
+      if #available(iOS 26.0, *) {
+        regularWidthConstraint = miniPlayer.glassContainer.widthAnchor
+          .constraint(equalToConstant: playerWidth)
+        regularWidthConstraint?.isActive = true
+        centerConstraint?.isActive = true
+      }
       heightConstraint?.constant = 60.0
     } else if isInline {
       heightConstraint?.constant = 48.0
@@ -181,7 +316,7 @@ class TabBarVC: UITabBarController {
       heightConstraint?.constant = 48.0
       centerConstraint?.isActive = false
       regularWidthConstraint?.isActive = false
-      compactWidthConstraint?.isActive = true
+      compactWidthConstraint?.isActive = compactWidthConstraint?.firstItem != nil
     }
 
     miniPlayer.glassContainer.setNeedsLayout()
@@ -196,7 +331,11 @@ class TabBarVC: UITabBarController {
   override func viewIsAppearing(_ animated: Bool) {
     super.viewIsAppearing(animated)
     refresh()
-    selectedTab = homeTab
+    if #available(iOS 18.0, *), !usesClassicTabs {
+      selectedTab = homeTab
+    } else {
+      selectedViewController = classicHomeNav
+    }
     welcomePopupPresenter.displayInfoPopupsIfNeeded()
   }
 
@@ -206,39 +345,42 @@ class TabBarVC: UITabBarController {
   }
 
   func refresh() {
-    guard let libraryGroup else { return }
-    let config = appDelegate.storage.settings.accounts.getSetting(account.info).read
-      .libraryDisplaySettings
-    libraryGroup.displayOrderIdentifiers = config.order.compactMap { "Tabs.\($0.displayName)" }
-    for tab in libraryGroup.displayOrder {
-      guard let item = LibraryDisplayType.createByDisplayName(name: tab.title) else { continue }
-      if let _ = config.inUse.first(where: { $0 == item }) {
-        tab.isHidden = false
-      } else {
-        tab.isHidden = true
+    if #available(iOS 18.0, *), let libraryGroup, !usesClassicTabs {
+      let config = appDelegate.storage.settings.accounts.getSetting(account.info).read
+        .libraryDisplaySettings
+      libraryGroup.displayOrderIdentifiers = config.order.compactMap { "Tabs.\($0.displayName)" }
+      for tab in libraryGroup.displayOrder {
+        guard let item = LibraryDisplayType.createByDisplayName(name: tab.title) else { continue }
+        if let _ = config.inUse.first(where: { $0 == item }) {
+          tab.isHidden = false
+        } else {
+          tab.isHidden = true
+        }
       }
     }
   }
 
   public func push(vc: UIViewController) {
-    guard let libraryGroup else { return }
-    // Select the library first: changing the selection rebuilds the managed navigation stack,
-    // which would otherwise drop a view controller pushed beforehand (no back button).
-    if selectedTab?.managingTabGroup !== libraryGroup, selectedTab !== libraryGroup {
-      selectedTab = libraryGroup
+    if #available(iOS 18.0, *), let libraryGroup, !usesClassicTabs {
+      if selectedTab?.managingTabGroup !== libraryGroup, selectedTab !== libraryGroup {
+        selectedTab = libraryGroup
+      }
+      libraryGroup.managingNavigationController?.pushViewController(vc, animated: true)
+      return
     }
-    libraryGroup.managingNavigationController?.pushViewController(vc, animated: true)
+    selectedViewController = classicLibraryNav
+    classicLibraryNav?.pushViewController(vc, animated: true)
   }
 }
 
 // MARK: UITabBarControllerDelegate
 
 extension TabBarVC: UITabBarControllerDelegate {
+  @available(iOS 18.0, *)
   func tabBarControllerDidEndEditing(_ tabBarController: UITabBarController) {
     var order = [LibraryDisplayType]()
     var visibleItems = Set<LibraryDisplayType>()
     guard let libraryGroup else { return }
-    // display order contains the hidden tabs too -> keep their position
     for tab in libraryGroup.displayOrder {
       guard let item = LibraryDisplayType.createByDisplayName(name: tab.title) else { continue }
       order.append(item)
@@ -265,17 +407,29 @@ extension TabBarVC: MainSceneHostingViewController {
   }
 
   public func pushLibraryCategory(vc: UIViewController) {
-    guard let libraryGroup else { return }
-    libraryGroup.managingNavigationController?.popToRootViewController(animated: false)
+    if #available(iOS 18.0, *), let libraryGroup, !usesClassicTabs {
+      libraryGroup.managingNavigationController?.popToRootViewController(animated: false)
+      push(vc: vc)
+      return
+    }
+    classicLibraryNav?.popToRootViewController(animated: false)
     push(vc: vc)
   }
 
   func pushTabCategory(tabCategory: TabNavigatorItem) {
     switch tabCategory {
     case .home:
-      selectedTab = homeTab
+      if #available(iOS 18.0, *), !usesClassicTabs {
+        selectedTab = homeTab
+      } else {
+        selectedViewController = classicHomeNav
+      }
     case .search:
-      selectedTab = searchTab
+      if #available(iOS 18.0, *), !usesClassicTabs {
+        selectedTab = searchTab
+      } else {
+        selectedViewController = classicSearchNav
+      }
     case .playlistGenerator:
       push(vc: tabCategory.getController(account: account))
     }
@@ -283,21 +437,34 @@ extension TabBarVC: MainSceneHostingViewController {
   }
 
   func displaySearch() {
-    guard let searchTab else { return }
     visualizePopupPlayer(direction: .close, animated: true) {
-      self.selectedTab = searchTab
-      searchTab.viewController?.navigationController?.popToRootViewController(animated: false)
-      Task {
-        try await Task.sleep(nanoseconds: 500_000_000)
-        if let searchTabVC = searchTab.viewController?.navigationController?
-          .topViewController as? SearchVC {
-          searchTabVC.activateSearchBar()
+      if #available(iOS 18.0, *), let searchTab = self.searchTab, !self.usesClassicTabs {
+        self.selectedTab = searchTab
+        searchTab.viewController?.navigationController?.popToRootViewController(animated: false)
+        Task {
+          try await Task.sleep(nanoseconds: 500_000_000)
+          if let searchTabVC = searchTab.viewController?.navigationController?
+            .topViewController as? SearchVC {
+            searchTabVC.activateSearchBar()
+          }
+        }
+      } else {
+        self.selectedViewController = self.classicSearchNav
+        self.classicSearchNav?.popToRootViewController(animated: false)
+        Task {
+          try await Task.sleep(nanoseconds: 500_000_000)
+          if let searchTabVC = self.classicSearchNav?.topViewController as? SearchVC {
+            searchTabVC.activateSearchBar()
+          }
         }
       }
     }
   }
 
   func getSafeAreaExtension() -> CGFloat {
-    0.0
+    if #available(iOS 26.0, *) {
+      return 0.0
+    }
+    return (heightConstraint?.constant ?? 48) + 16
   }
 }

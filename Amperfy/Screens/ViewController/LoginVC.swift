@@ -161,7 +161,12 @@ class LoginVC: UIViewController {
   }
 
   fileprivate lazy var apiSelectorButton: UIButton = {
-    var config = UIButton.Configuration.glass()
+    var config: UIButton.Configuration
+    if #available(iOS 26.0, *) {
+      config = .glass()
+    } else {
+      config = .bordered()
+    }
     let button = UIButton(configuration: config)
     button.setTitle("API", for: .normal)
     button.preferredBehavioralStyle = .pad
@@ -169,7 +174,12 @@ class LoginVC: UIViewController {
   }()
 
   fileprivate lazy var loginButton: UIButton = {
-    var config = UIButton.Configuration.prominentGlass()
+    var config: UIButton.Configuration
+    if #available(iOS 26.0, *) {
+      config = .prominentGlass()
+    } else {
+      config = .borderedProminent()
+    }
     config.image = .login
     config.imagePadding = 20.0
     let button = UIButton(configuration: config)
@@ -181,7 +191,12 @@ class LoginVC: UIViewController {
   }()
 
   fileprivate lazy var httpHeadersButton: UIButton = {
-    var config = UIButton.Configuration.glass()
+    var config: UIButton.Configuration
+    if #available(iOS 26.0, *) {
+      config = .glass()
+    } else {
+      config = .bordered()
+    }
     let button = UIButton(configuration: config)
     button.setTitle("Custom HTTP Headers", for: .normal)
     button.accessibilityLabel = "Custom HTTP Headers"
@@ -212,7 +227,12 @@ class LoginVC: UIViewController {
 
   // Close button shown when presented as a sheet/modal
   fileprivate lazy var closeButton: UIButton = {
-    var config = UIButton.Configuration.prominentGlass()
+    var config: UIButton.Configuration
+    if #available(iOS 26.0, *) {
+      config = .prominentGlass()
+    } else {
+      config = .borderedProminent()
+    }
     config.image = .xmark
     config.imagePadding = 20.0
     let button = UIButton(configuration: config)
@@ -388,13 +408,19 @@ class LoginVC: UIViewController {
 
   public lazy var formGlassContainer: UIVisualEffectView = {
     let container = UIVisualEffectView()
-    let glassEffect = UIGlassEffect(style: .regular)
-    glassEffect.isInteractive = false
-    glassEffect.tintColor = appDelegate.storage.settings.accounts.getSetting(nil).read
-      .themePreference.asColor
-      .withAlphaComponent(0.1)
-    container.effect = glassEffect
-    container.cornerConfiguration = .corners(radius: 20)
+    if #available(iOS 26.0, *) {
+      let glassEffect = UIGlassEffect(style: .regular)
+      glassEffect.isInteractive = false
+      glassEffect.tintColor = appDelegate.storage.settings.accounts.getSetting(nil).read
+        .themePreference.asColor
+        .withAlphaComponent(0.1)
+      container.effect = glassEffect
+      container.cornerConfiguration = .corners(radius: 20)
+    } else {
+      container.effect = UIBlurEffect(style: .systemMaterial)
+      container.layer.cornerRadius = 20
+      container.clipsToBounds = true
+    }
     mainContainerView.translatesAutoresizingMaskIntoConstraints = false
     container.contentView.addSubview(mainContainerView)
 
@@ -592,9 +618,7 @@ class LoginVC: UIViewController {
     closeButton.isHidden = !isModal
   }
 
-  override func updateProperties() {
-    super.updateProperties()
-
+  private func updateFormInsets() {
     var outerInset: CGFloat = 25
     if traitCollection.horizontalSizeClass == .compact {
       outerInset = 20
@@ -608,13 +632,25 @@ class LoginVC: UIViewController {
     mainContainerPaddingBottomConstraint?.constant = -outerInset + 6
   }
 
+  @available(iOS 26.0, *)
+  override func updateProperties() {
+    super.updateProperties()
+    updateFormInsets()
+  }
+
   override func viewWillLayoutSubviews() {
-    let glassEffect = UIGlassEffect(style: .regular)
-    glassEffect.isInteractive = false
-    glassEffect.tintColor = appDelegate.storage.settings.accounts.getSetting(nil).read
-      .themePreference.asColor
-      .withAlphaComponent(0.1)
-    formGlassContainer.effect = glassEffect
+    super.viewWillLayoutSubviews()
+    if #unavailable(iOS 26.0) {
+      updateFormInsets()
+    }
+    if #available(iOS 26.0, *) {
+      let glassEffect = UIGlassEffect(style: .regular)
+      glassEffect.isInteractive = false
+      glassEffect.tintColor = appDelegate.storage.settings.accounts.getSetting(nil).read
+        .themePreference.asColor
+        .withAlphaComponent(0.1)
+      formGlassContainer.effect = glassEffect
+    }
 
     if formGlassContainer.frame.width < 600 {
       formLeadingConstraing?.priority = .required

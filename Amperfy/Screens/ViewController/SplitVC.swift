@@ -65,7 +65,7 @@ class SplitVC: UISplitViewController {
     miniPlayer!.configureForMac()
     guard let miniPlayer else { return }
 
-    let inspectorWidth = viewController(for: .inspector)?.view.bounds.width ?? 0.0
+    let inspectorWidth = currentInspectorWidth()
     displayOrHideInspector()
 
     view.addSubview(miniPlayer.glassContainer)
@@ -101,7 +101,7 @@ class SplitVC: UISplitViewController {
   override func viewWillLayoutSubviews() {
     super.viewWillLayoutSubviews()
 
-    let inspectorWidth = viewController(for: .inspector)?.view.bounds.width ?? 0.0
+    let inspectorWidth = currentInspectorWidth()
 
     miniPlayerLeadingConstraint?.constant = (isSidebarVisible ? primaryColumnWidth : -0) + 40
     miniPlayerTrailingConstraint?.constant = -inspectorWidth - 40
@@ -113,13 +113,23 @@ class SplitVC: UISplitViewController {
     // set min and max sidebar width
     minimumPrimaryColumnWidth = Self.sidebarWidth
     maximumPrimaryColumnWidth = Self.sidebarWidth
-    minimumInspectorColumnWidth = Self.sidebarWidth
-    maximumInspectorColumnWidth = Self.sidebarWidth
+    if #available(iOS 26.0, *) {
+      minimumInspectorColumnWidth = Self.sidebarWidth
+      maximumInspectorColumnWidth = Self.sidebarWidth
+    }
     welcomePopupPresenter.displayInfoPopupsIfNeeded()
     miniPlayer?.refreshPlayer()
   }
 
+  private func currentInspectorWidth() -> CGFloat {
+    if #available(iOS 26.0, *) {
+      return viewController(for: .inspector)?.view.bounds.width ?? 0.0
+    }
+    return 0.0
+  }
+
   func displayOrHideInspector() {
+    guard #available(iOS 26.0, *) else { return }
     if appDelegate.storage.settings.user.isPlayerLyricsDisplayed {
       let lyricsVC = LyricsVC()
       setViewController(lyricsVC, for: .inspector)

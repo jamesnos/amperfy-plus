@@ -182,21 +182,17 @@ class PlaylistsVC: SingleSnapshotFetchedResultsTableViewController<PlaylistMO> {
   func updateContentUnavailable() {
     if fetchedResultsController.fetchedObjects?.count ?? 0 == 0 {
       if fetchedResultsController.isSearchActive {
-        contentUnavailableConfiguration = UIContentUnavailableConfiguration.search()
+        setAmperfyUnavailableContent(.search())
       } else {
-        contentUnavailableConfiguration = emptyContentConfig
+        setAmperfyUnavailableContent(emptyContentConfig)
       }
     } else {
-      contentUnavailableConfiguration = nil
+      setAmperfyUnavailableContent(nil)
     }
   }
 
-  lazy var emptyContentConfig: UIContentUnavailableConfiguration = {
-    var config = UIContentUnavailableConfiguration.empty()
-    config.image = .playlist
-    config.text = "No Playlists"
-    config.secondaryText = "Your playlists will appear here."
-    return config
+  lazy var emptyContentConfig: AmperfyUnavailableContent = {
+    .empty(image: .playlist, text: "No Playlists", secondaryText: "Your playlists will appear here.")
   }()
 
   func change(sortType: PlaylistSortType) {

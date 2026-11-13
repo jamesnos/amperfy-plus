@@ -48,15 +48,50 @@ extension CarPlaySceneDelegate {
   static let playRandomSongsTitle = "Songs"
 
   func createLibrarySections() -> [CPListSection] {
-    let librarySections = [
-      createQuickActionsSection(),
-      createPlayRandomSection(),
-      createLibraryNavigationTypeSection(),
-    ].compactMap { $0 }
-
-    return librarySections
+    if #available(iOS 26.0, *) {
+      let librarySections = [
+        createQuickActionsSection(),
+        createPlayRandomSection(),
+        createLibraryNavigationTypeSection(),
+      ].compactMap { $0 }
+      return librarySections
+    }
+    // iOS 16–25: plain list items (image-row elements require iOS 26).
+    var items = [CPListItem]()
+    for libDisplayType in appDelegate.storage.settings.accounts.getSetting(activeAccountInfo).read
+      .libraryDisplaySettings.inUse {
+      guard libDisplayType.isVisibleInCarPlay else { continue }
+      let item = CPListItem(text: libDisplayType.displayName, detailText: nil)
+      item.handler = { [weak self] _, completion in
+        guard let self else { completion(); return }
+        let sectionToDisplay: CPListTemplate? = {
+          switch libDisplayType {
+          case .genres: return self.genresSection
+          case .artists: return self.artistsSection
+          case .albums: return self.albumsSection
+          case .podcasts: return self.podcastSection
+          case .favoriteSongs: return self.songsFavoriteSection
+          case .favoriteAlbums: return self.albumsFavoriteSection
+          case .favoriteArtists: return self.artistsFavoriteSection
+          case .newestAlbums: return self.albumsNewestSection
+          case .recentAlbums: return self.albumsRecentSection
+          case .radios: return self.radioSection
+          case .directories, .downloads, .playlists, .songs: return nil
+          }
+        }()
+        guard let sectionToDisplay else { completion(); return }
+        Task { @MainActor in
+          let _ = try? await self.interfaceController?
+            .pushTemplate(sectionToDisplay, animated: true)
+        }
+        completion()
+      }
+      items.append(item)
+    }
+    return items.isEmpty ? [] : [CPListSection(items: items)]
   }
 
+  @available(iOS 26.0, *)
   func createLibraryTypeImageRowElement(type: LibraryDisplayType) -> CPListImageRowItemRowElement {
     let baseImage = type.image
     let element = CPListImageRowItemRowElement(
@@ -72,6 +107,7 @@ extension CarPlaySceneDelegate {
     return element
   }
 
+  @available(iOS 26.0, *)
   func createLibraryNavigationTypeSection() -> CPListSection {
     var libDisplayItems = [CPListImageRowItemRowElement]()
     for libDisplayType in appDelegate.storage.settings.accounts.getSetting(activeAccountInfo).read
@@ -133,6 +169,7 @@ extension CarPlaySceneDelegate {
     return libDisplaySection
   }
 
+  @available(iOS 26.0, *)
   func createPlayRandomSection() -> CPListSection {
     var playRandomItems = [CPListImageRowItemRowElement]()
     let playRandomAlbumsItem = CPListImageRowItemRowElement(
@@ -185,6 +222,7 @@ extension CarPlaySceneDelegate {
     return playRandomSection
   }
 
+  @available(iOS 26.0, *)
   func createQuickActionsSection() -> CPListSection? {
     var quickActionItems = [CPListImageRowItemRowElement]()
     if appDelegate.player.musicItemCount > 0 {

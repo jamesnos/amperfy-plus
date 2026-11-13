@@ -620,10 +620,17 @@ class EntityPreviewActionBuilder {
       },
     ]
 
+    if #available(iOS 17.0, *) {
+      return UIMenu(
+        title: "Rating: \(rating)",
+        image: menuIcon,
+        options: .displayAsPalette,
+        children: children
+      )
+    }
     return UIMenu(
       title: "Rating: \(rating)",
       image: menuIcon,
-      options: .displayAsPalette,
       children: children
     )
   }
@@ -1071,9 +1078,11 @@ class EntityPreviewActionBuilder {
     } else if let popupPlayer = rootView as? PopupPlayerVC {
       popupPlayer.tableView.reloadData()
     }
-    if let splitVC = rootView as? SplitVC,
-       let queueVC = splitVC.viewController(for: .inspector) as? QueueVC {
-      queueVC.tableView?.reloadData()
+    if let splitVC = rootView as? SplitVC {
+      if #available(iOS 26.0, *),
+         let queueVC = splitVC.viewController(for: .inspector) as? QueueVC {
+        queueVC.tableView?.reloadData()
+      }
     }
   }
 }

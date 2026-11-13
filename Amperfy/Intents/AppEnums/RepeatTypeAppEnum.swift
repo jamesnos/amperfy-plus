@@ -33,8 +33,7 @@ enum RepeatTypeAppEnum: Int, AppEnum {
     .single: DisplayRepresentation(title: "One", image: .init(systemName: "repeat.1")),
     .all: DisplayRepresentation(
       title: "All",
-      image: .init(systemName: "repeat"),
-      synonyms: ["on", "repeat"]
+      image: .init(systemName: "repeat")
     ),
     .off: DisplayRepresentation(title: "Off", image: .init(systemName: "repeat.badge.xmark")),
   ]

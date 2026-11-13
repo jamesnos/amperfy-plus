@@ -104,23 +104,19 @@ class RadiosVC: SingleFetchedResultsTableViewController<RadioMO> {
   func updateContentUnavailable() {
     if fetchedResultsController.fetchedObjects?.count ?? 0 == 0 {
       if fetchedResultsController.isSearchActive {
-        contentUnavailableConfiguration = UIContentUnavailableConfiguration.search()
+        setAmperfyUnavailableContent(.search())
       } else {
-        contentUnavailableConfiguration = emptyContentConfig
+        setAmperfyUnavailableContent(emptyContentConfig)
       }
       detailHeaderView?.isHidden = true
     } else {
-      contentUnavailableConfiguration = nil
+      setAmperfyUnavailableContent(nil)
       detailHeaderView?.isHidden = false
     }
   }
 
-  lazy var emptyContentConfig: UIContentUnavailableConfiguration = {
-    var config = UIContentUnavailableConfiguration.empty()
-    config.image = .radio
-    config.text = "No Radios"
-    config.secondaryText = "Your radios will appear here."
-    return config
+  lazy var emptyContentConfig: AmperfyUnavailableContent = {
+    .empty(image: .radio, text: "No Radios", secondaryText: "Your radios will appear here.")
   }()
 
   override func viewWillAppear(_ animated: Bool) {

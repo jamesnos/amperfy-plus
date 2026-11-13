@@ -235,6 +235,7 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     return homeTab
   }()
 
+  @available(iOS 26.0, *)
   struct EntityImageRowContainer {
     let entity: AbstractLibraryEntity
     let item: HomeItem
@@ -244,7 +245,8 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
 
   var homeImageRows: [HomeSection: CPListImageRowItem] = [:]
   var homeRowData: [HomeSection: [HomeItem]] = [:]
-  var homeArtworkUpdate: [String: EntityImageRowContainer] = [:] // String is Artwork.uniqueID
+  /// Boxed as Any because EntityImageRowContainer requires iOS 26.
+  var homeArtworkUpdate: [String: Any] = [:] // String is Artwork.uniqueID
 
   lazy var cachedTab = {
     let cachedTab = CPListTemplate(title: "Cached", sections: createCachedSections())
@@ -475,8 +477,9 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     else { return }
     guard let templates = interfaceController?.templates else { return }
 
-    // refresh Home image rows
-    if let container = homeArtworkUpdate[downloadNotification.id] {
+    // refresh Home image rows (image-row elements require iOS 26)
+    if #available(iOS 26.0, *),
+       let container = homeArtworkUpdate[downloadNotification.id] as? EntityImageRowContainer {
       var imageRowImages = container.homeRow
       imageRowImages.append(contentsOf: container.detailRow)
       let image = LibraryEntityImage.getImageToDisplayImmediately(
@@ -491,13 +494,14 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     }
 
     // refresh Home Detail rows
-    if templates.count == 2,
+    if #available(iOS 26.0, *),
+       templates.count == 2,
        let tabBarTemplate = templates.first as? CPTabBarTemplate,
        homeTab == tabBarTemplate.selectedTemplate,
        let listTemplate = templates.last as? CPListTemplate,
        listTemplate.sections.count == 1,
        let detailRow = listTemplate.sections.first?.items.first as? CPListImageRowItem,
-       var container = homeArtworkUpdate[downloadNotification.id] {
+       var container = homeArtworkUpdate[downloadNotification.id] as? EntityImageRowContainer {
       var newCreatedRowImages = [CPListImageRowItemRowElement]()
       for detailRowImage in container.detailRow {
         if let elementIndex = detailRow.elements.firstIndex(where: { $0 == detailRowImage }) {
@@ -517,6 +521,7 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
         }
       }
       container.detailRow = newCreatedRowImages
+      homeArtworkUpdate[downloadNotification.id] = container
     }
 
     // refresh List items

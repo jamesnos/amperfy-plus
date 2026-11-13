@@ -62,7 +62,7 @@ struct SettingsTabView: View {
       }
       // Pop views pushed in the previous menu (e.g. Support -> Event Log) when another menu is
       // selected. This requires all pushes to be value based (NavigationLink(value:)).
-      .onChange(of: selectedMenu) {
+      .onChange(of: selectedMenu) { _ in
         detailPath = NavigationPath()
       }
     }

@@ -208,14 +208,18 @@ struct LibrarySettingsView: View {
               data: [("Cache Size Limit", byteValues), ("", [" MB", " GB"])],
               selection: $cacheSelection
             )
-            .onChange(of: cacheSelection, changeHandler)
+            .onChange(of: cacheSelection) { newCacheString in
+              changeHandler(cacheSelection, newCacheString)
+            }
           #else
             NavigationLink(value: Destination.cacheSizeLimit) {
               SettingsRow(title: "Cache Size Limit") {
                 SecondaryText(cacheSizeLimit.description)
               }
             }
-            .onChange(of: cacheSelection, changeHandler)
+            .onChange(of: cacheSelection) { newCacheString in
+              changeHandler(cacheSelection, newCacheString)
+            }
           #endif
 
           if let activeAccountInfo = settings.activeAccountInfo {

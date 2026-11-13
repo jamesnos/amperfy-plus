@@ -171,7 +171,9 @@ class SearchVC: BasicTableViewController {
     accountObjectId = account.managedObject.objectID
     searchHistory = appDelegate.storage.main.library.getSearchHistory(for: account)
     updateDataSource(animated: false)
-    navigationController?.navigationItem.searchBarPlacementAllowsExternalIntegration = true
+    if #available(iOS 26.0, *) {
+      navigationController?.navigationItem.searchBarPlacementAllowsExternalIntegration = true
+    }
 
     tableView.register(nibName: PlaylistTableCell.typeName)
     tableView.register(nibName: GenericTableCell.typeName)
@@ -968,20 +970,16 @@ class SearchVC: BasicTableViewController {
   func updateContentUnavailable() {
     if isSearchActive {
       if artists.isEmpty, albums.isEmpty, playlists.isEmpty, featuredSongs.isEmpty, songs.isEmpty {
-        contentUnavailableConfiguration = UIContentUnavailableConfiguration.search()
+        setAmperfyUnavailableContent(.search())
       } else {
-        contentUnavailableConfiguration = nil
+        setAmperfyUnavailableContent(nil)
       }
     } else {
-      contentUnavailableConfiguration = searchHistory.isEmpty ? noSearchHistoryConfig : nil
+      setAmperfyUnavailableContent(searchHistory.isEmpty ? noSearchHistoryConfig : nil)
     }
   }
 
-  lazy var noSearchHistoryConfig: UIContentUnavailableConfiguration = {
-    var config = UIContentUnavailableConfiguration.empty()
-    config.image = .clock
-    config.text = "No Search History"
-    config.secondaryText = "Your search history will appear here."
-    return config
+  lazy var noSearchHistoryConfig: AmperfyUnavailableContent = {
+    .empty(image: .clock, text: "No Search History", secondaryText: "Your search history will appear here.")
   }()
 }

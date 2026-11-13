@@ -31,11 +31,26 @@ struct EventLogSettingsView: View {
   var body: some View {
     ZStack {
       if entries.isEmpty {
-        ContentUnavailableView(
-          "No Events",
-          systemImage: "list.bullet.rectangle",
-          description: Text("Errors and other events will be listed here.")
-        )
+        if #available(iOS 17.0, *) {
+          ContentUnavailableView(
+            "No Events",
+            systemImage: "list.bullet.rectangle",
+            description: Text("Errors and other events will be listed here.")
+          )
+        } else {
+          VStack(spacing: 8) {
+            Image(systemName: "list.bullet.rectangle")
+              .font(.system(size: 40))
+              .foregroundStyle(.secondary)
+            Text("No Events")
+              .font(.headline)
+            Text("Errors and other events will be listed here.")
+              .font(.subheadline)
+              .foregroundStyle(.secondary)
+              .multilineTextAlignment(.center)
+          }
+          .padding()
+        }
       } else {
         List {
           ForEach(entries, id: \.self) { entry in

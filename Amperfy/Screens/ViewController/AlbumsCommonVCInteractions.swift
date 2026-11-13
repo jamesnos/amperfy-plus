@@ -134,21 +134,21 @@ class AlbumsCommonVCInteractions {
   func updateContentUnavailable() {
     if isContentUnavailable {
       if fetchedResultsController.isSearchActive {
-        rootVC?.contentUnavailableConfiguration = UIContentUnavailableConfiguration.search()
+        rootVC?.setAmperfyUnavailableContent(.search())
       } else {
-        rootVC?.contentUnavailableConfiguration = emptyContentConfig
+        rootVC?.setAmperfyUnavailableContent(emptyContentConfig)
       }
     } else {
-      rootVC?.contentUnavailableConfiguration = nil
+      rootVC?.setAmperfyUnavailableContent(nil)
     }
   }
 
-  lazy var emptyContentConfig: UIContentUnavailableConfiguration = {
-    var config = UIContentUnavailableConfiguration.empty()
-    config.image = .album
-    config.text = "No " + filterTitle
-    config.secondaryText = "Your " + filterTitle.lowercased() + " will appear here."
-    return config
+  lazy var emptyContentConfig: AmperfyUnavailableContent = {
+    .empty(
+      image: .album,
+      text: "No " + filterTitle,
+      secondaryText: "Your " + filterTitle.lowercased() + " will appear here."
+    )
   }()
 
   func applyFilter() {

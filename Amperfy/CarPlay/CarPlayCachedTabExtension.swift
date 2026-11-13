@@ -40,13 +40,16 @@ extension LibraryDisplayType {
 
 extension CarPlaySceneDelegate {
   func createCachedSections() -> [CPListSection] {
-    let librarySections = [
-      createPlayRandomCachedSection(),
-      createCachedLibraryNavigationTypeSection(),
-    ]
-    return librarySections
+    if #available(iOS 26.0, *) {
+      return [
+        createPlayRandomCachedSection(),
+        createCachedLibraryNavigationTypeSection(),
+      ]
+    }
+    return []
   }
 
+  @available(iOS 26.0, *)
   func createCachedLibraryNavigationTypeSection() -> CPListSection {
     var libDisplayItems = [CPListImageRowItemRowElement]()
     for libDisplayType in appDelegate.storage.settings.accounts.getSetting(activeAccountInfo).read
@@ -108,6 +111,7 @@ extension CarPlaySceneDelegate {
     return libDisplaySection
   }
 
+  @available(iOS 26.0, *)
   func createPlayRandomCachedSection() -> CPListSection {
     var playRandomItems = [CPListImageRowItemRowElement]()
     let playRandomAlbumsItem = CPListImageRowItemRowElement(

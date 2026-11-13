@@ -24,19 +24,24 @@ import AmperfyKit
 
 extension AppDelegate {
   func configureMainMenu() {
-    let config = UIMainMenuSystem.Configuration()
-    config.newScenePreference = .removed
-    config.documentPreference = .removed
-    config.printingPreference = .removed
-    config.findingPreference = .included
-    config.findingConfiguration.style = .search
-    config.toolbarPreference = .included
-    config.sidebarPreference = .included
-    config.inspectorPreference = .included
-    config.textFormattingPreference = .removed
+    if #available(iOS 26.0, *) {
+      let config = UIMainMenuSystem.Configuration()
+      config.newScenePreference = .removed
+      config.documentPreference = .removed
+      config.printingPreference = .removed
+      config.findingPreference = .included
+      config.findingConfiguration.style = .search
+      config.toolbarPreference = .included
+      config.sidebarPreference = .included
+      config.inspectorPreference = .included
+      config.textFormattingPreference = .removed
 
-    UIMainMenuSystem.shared.setBuildConfiguration(config) { builder in
-      self.buildMainMenu(with: builder)
+      UIMainMenuSystem.shared.setBuildConfiguration(config) { builder in
+        self.buildMainMenu(with: builder)
+      }
+    } else {
+      // iOS 16–25: fall back to UIMenuSystem rebuild hooks only.
+      UIMenuSystem.main.setNeedsRebuild()
     }
   }
 
