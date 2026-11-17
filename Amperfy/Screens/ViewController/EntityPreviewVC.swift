@@ -22,6 +22,7 @@
 import AmperfyKit
 import Foundation
 import MarqueeLabel
+import SwiftUI
 import UIKit
 
 typealias GetPlayContextCallback = () -> PlayContext?
@@ -175,9 +176,12 @@ class EntityPreviewActionBuilder {
       menuActions.append(createCopyIdToClipboardAction())
     }
     if let playlist = entityContainer as? Playlist {
-      menuActions.append(UIMenu(options: .displayInline, children: [
-        createExportPlaylistAction(playlist: playlist),
-      ]))
+      var playlistActions = [UIMenuElement]()
+      if !playlist.isSmartPlaylist {
+        playlistActions.append(createRenamePlaylistAction(playlist: playlist))
+      }
+      playlistActions.append(createExportPlaylistAction(playlist: playlist))
+      menuActions.append(UIMenu(options: .displayInline, children: playlistActions))
       if !playlist.isSmartPlaylist,
          appDelegate.storage.settings.user.isOnlineMode {
         menuActions.append(UIMenu(options: .displayInline, children: [
@@ -797,6 +801,54 @@ class EntityPreviewActionBuilder {
          let accountInfo = self.entityPlayables.first?.account?.info {
         self.appDelegate.getMeta(accountInfo).playableDownloadManager
           .download(objects: self.entityPlayables)
+      }
+    }
+  }
+
+  private func createRenamePlaylistAction(playlist: Playlist) -> UIAction {
+    UIAction(title: "Rename Playlist", image: UIImage(systemName: "pencil")) { _ in
+      self.presentRenamePlaylistSheet(playlist: playlist)
+    }
+  }
+
+  private func presentRenamePlaylistSheet(playlist: Playlist) {
+    PlaylistRenamePresenter.present(
+      from: rootView,
+      playlist: playlist,
+      themeColor: accountThemeColor(for: playlist)
+    ) { newName in
+      guard newName != playlist.name else { return }
+      self.renamePlaylist(playlist, to: newName)
+    }
+  }
+
+  private func accountThemeColor(for playlist: Playlist) -> Color {
+    let settings = appDelegate.storage.settings.accounts
+    if let account = playlist.account {
+      return settings.getSetting(account.info).read.themePreference.asSwiftUIColor
+    }
+    if let active = settings.active {
+      return settings.getSetting(active).read.themePreference.asSwiftUIColor
+    }
+    return ThemePreference.defaultValue.asSwiftUIColor
+  }
+
+  private func renamePlaylist(_ playlist: Playlist, to newName: String) {
+    playlist.name = newName
+    appDelegate.storage.main.saveContext()
+    if let detailVC = rootView as? PlaylistDetailVC {
+      detailVC.navigationItem.title = newName
+      detailVC.detailOperationsView?.refresh()
+    }
+    guard appDelegate.storage.settings.user.isOnlineMode,
+          let account = playlist.account
+    else { return }
+    Task { @MainActor in
+      do {
+        try await self.appDelegate.getMeta(account.info).librarySyncer
+          .syncUpload(playlistToUpdateName: playlist)
+      } catch {
+        self.appDelegate.eventLogger.report(topic: "Playlist Update Name", error: error)
       }
     }
   }

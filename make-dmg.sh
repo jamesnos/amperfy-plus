@@ -46,8 +46,14 @@ cat > "$LOCAL_ENTITLEMENTS" <<'EOF'
 	<true/>
 	<key>com.apple.security.files.downloads.read-write</key>
 	<true/>
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<key>com.apple.security.temporary-exception.files.absolute-path.read-only</key>
+	<array>
+		<string>/Volumes/</string>
+	</array>
 </dict>
 </plist>
 EOF

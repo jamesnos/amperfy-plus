@@ -142,15 +142,26 @@ extension AppDelegate: AlertDisplayable {
       topView.present(popupVC, animated: true, completion: nil)
     }
 
-    // Pin a compact toast to the top-right on Mac / iPad; phones stay near full width.
-    // Measure the text at that width. The banner otherwise sizes itself for the full window,
-    // and the message draws outside the colored fill.
+    // NotificationBannerSwift always sizes the frame as `appWindow.width - left - right`,
+    // even when `on:` attaches to another VC. Insets MUST be computed against that same
+    // window width — using the tab/split width while a mini-player window is `windows.first`
+    // collapses the toast to ~1 character wide (vertical letter stack).
     let isPhone = UIDevice.current.userInterfaceIdiom == .phone
     let horizontalPadding: CGFloat = 16
-    let hostWidth = topView.view.bounds.width > 1
-      ? topView.view.bounds.width
-      : (UIApplication.shared.mainWindow?.bounds.width ?? 800)
-    let preferredWidth = isPhone ? hostWidth - (horizontalPadding * 2) : 440
+    let windowWidth = Self.bannerHostWidth(fallbackView: topView.view)
+    let maxContentWidth = isPhone
+      ? windowWidth - (horizontalPadding * 2)
+      : min(440, windowWidth - (horizontalPadding * 2))
+    let bannerWidth = max(260, maxContentWidth)
+    var rightInset = horizontalPadding
+    var leftInset = max(horizontalPadding, windowWidth - bannerWidth - rightInset)
+    // Guard against negative/near-zero content width if window metrics disagree.
+    if windowWidth - leftInset - rightInset < 260 {
+      leftInset = horizontalPadding
+      rightInset = horizontalPadding
+    }
+    let contentWidth = max(260, windowWidth - leftInset - rightInset)
+
     let titleFont = UIFont.systemFont(ofSize: 15, weight: .semibold)
     let subtitleFont = UIFont.systemFont(ofSize: 13)
     banner.bannerHeight = fittedBannerHeight(
@@ -158,14 +169,18 @@ extension AppDelegate: AlertDisplayable {
       subtitle: subtitle,
       titleFont: titleFont,
       subtitleFont: subtitleFont,
-      width: preferredWidth
+      width: contentWidth
     )
-    let leftInset = max(horizontalPadding, hostWidth - preferredWidth - horizontalPadding)
+    banner.titleLabel?.numberOfLines = 2
+    banner.subtitleLabel?.numberOfLines = 3
+    banner.titleLabel?.lineBreakMode = .byTruncatingTail
+    banner.subtitleLabel?.lineBreakMode = .byTruncatingTail
+
     let topViewInset = UIEdgeInsets(
       top: isPhone ? 40 : 16,
       left: leftInset,
       bottom: 16,
-      right: horizontalPadding
+      right: rightInset
     )
     banner.show(
       queuePosition: QueuePosition.back,
@@ -178,6 +193,17 @@ extension AppDelegate: AlertDisplayable {
     )
   }
 
+  /// Prefer the app's main window (not an auxiliary mini-player scene window).
+  private static func bannerHostWidth(fallbackView: UIView?) -> CGFloat {
+    if let main = UIApplication.shared.mainWindow?.bounds.width, main > 1 {
+      return main
+    }
+    if let fallback = fallbackView?.bounds.width, fallback > 1 {
+      return fallback
+    }
+    return 800
+  }
+
   private func fittedBannerHeight(
     title: String,
     subtitle: String,
@@ -185,8 +211,8 @@ extension AppDelegate: AlertDisplayable {
     subtitleFont: UIFont,
     width: CGFloat
   ) -> CGFloat {
-    let textWidth = max(160, width - 40)
-    func measured(_ text: String, font: UIFont) -> CGFloat {
+    let textWidth = max(220, width - 40)
+    func measured(_ text: String, font: UIFont, maxLines: Int) -> CGFloat {
       guard !text.isEmpty else { return 0 }
       let rect = (text as NSString).boundingRect(
         with: CGSize(width: textWidth, height: .greatestFiniteMagnitude),
@@ -194,10 +220,11 @@ extension AppDelegate: AlertDisplayable {
         attributes: [.font: font],
         context: nil
       )
-      return ceil(rect.height)
+      let lineHeight = ceil(font.lineHeight)
+      return min(ceil(rect.height), lineHeight * CGFloat(maxLines))
     }
-    let titleHeight = measured(title, font: titleFont)
-    let subtitleHeight = measured(subtitle, font: subtitleFont)
+    let titleHeight = measured(title, font: titleFont, maxLines: 2)
+    let subtitleHeight = measured(subtitle, font: subtitleFont, maxLines: 3)
     var textBlock = titleHeight + subtitleHeight
     if titleHeight > 0, subtitleHeight > 0 {
       textBlock += 8
@@ -207,9 +234,9 @@ extension AppDelegate: AlertDisplayable {
     // enough padding that both lines sit inside the fill.
     let spacerInsideFrame = UIDevice.current.userInterfaceIdiom == .phone
       ? 0
-      : UIApplication.shared.statusBarFrame.height
-    let contentHeight = max(textBlock + 48, 104)
-    return contentHeight + spacerInsideFrame
+      : min(UIApplication.shared.statusBarFrame.height, 48)
+    let contentHeight = max(textBlock + 48, 88)
+    return min(contentHeight + spacerInsideFrame, 180)
   }
 
   func display(popup popupVC: UIViewController) {

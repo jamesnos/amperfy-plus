@@ -468,7 +468,7 @@ extension TabBarVC: MainSceneHostingViewController {
       } else {
         selectedViewController = classicSearchNav
       }
-    case .playlistGenerator:
+    case .playlistGenerator, .directorySongList:
       push(vc: tabCategory.getController(account: account))
     }
     configureTraitChangesForMiniPlayer()

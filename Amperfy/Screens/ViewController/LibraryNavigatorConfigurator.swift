@@ -63,12 +63,14 @@ enum TabNavigatorItem: Int, Hashable, CaseIterable {
   case search
   case home
   case playlistGenerator
+  case directorySongList
 
   var title: String {
     switch self {
     case .home: return "Home"
     case .search: return "Search"
     case .playlistGenerator: return "Playlist Generator"
+    case .directorySongList: return "Song List from Folder"
     }
   }
 
@@ -78,6 +80,7 @@ enum TabNavigatorItem: Int, Hashable, CaseIterable {
     case .home: return .home
     case .search: return .search
     case .playlistGenerator: return .playlistPlus
+    case .directorySongList: return .folder
     }
   }
 
@@ -88,6 +91,8 @@ enum TabNavigatorItem: Int, Hashable, CaseIterable {
     case .search: return AppStoryboard.Main.segueToSearch(account: account)
     case .playlistGenerator:
       return PlaylistGeneratorHostVC(account: account)
+    case .directorySongList:
+      return DirectorySongListHostVC()
     }
   }
 }

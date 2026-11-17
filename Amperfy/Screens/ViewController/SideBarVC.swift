@@ -46,6 +46,7 @@ class SideBarVC: KeyCommandCollectionViewController {
     [
       LibraryNavigatorItem(title: "Tools", isInteractable: false),
       LibraryNavigatorItem(title: "Playlist Generator", tab: .playlistGenerator),
+      LibraryNavigatorItem(title: "Song List from Folder", tab: .directorySongList),
     ]
   }()
 

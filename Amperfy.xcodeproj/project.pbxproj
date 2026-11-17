@@ -535,6 +535,9 @@
 		50F40A3B2C9088B30097FE63 /* IfritStatic in Frameworks */ = {isa = PBXBuildFile; productRef = 50F40A3A2C9088B30097FE63 /* IfritStatic */; };
 		50FA36532F560D670058AB56 /* SeekableTimeSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50FA36522F560D670058AB56 /* SeekableTimeSlider.swift */; };
 		50FA36552F560E010058AB56 /* AirPlayRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50FA36542F560E010058AB56 /* AirPlayRouter.swift */; };
+		50FA36572F560F020058AB56 /* PlaylistRenameSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50FA36562F560F020058AB56 /* PlaylistRenameSheet.swift */; };
+		50FA36592F5610010058AB56 /* DirectorySongListModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50FA36582F5610010058AB56 /* DirectorySongListModel.swift */; };
+		50FA365B2F5610010058AB56 /* DirectorySongListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50FA365A2F5610010058AB56 /* DirectorySongListView.swift */; };
 		50FF311B2BBC4D8000C2C3B9 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50FF311A2BBC4D8000C2C3B9 /* NetworkMonitor.swift */; };
 		50RA71NG2F5A01240085CBB3 /* RatingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50RA71NG2F5A01230085CBB3 /* RatingView.swift */; };
 		631C166B2C6D3D9A0085F62E /* SettingsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 631C166A2C6D3D9A0085F62E /* SettingsRow.swift */; };
@@ -1165,6 +1168,9 @@
 		50F81EDB23BF6B1E00EAAC3E /* SongMO+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SongMO+CoreDataProperties.swift"; sourceTree = "<group>"; };
 		50FA36522F560D670058AB56 /* SeekableTimeSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeekableTimeSlider.swift; sourceTree = "<group>"; };
 		50FA36542F560E010058AB56 /* AirPlayRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPlayRouter.swift; sourceTree = "<group>"; };
+		50FA36562F560F020058AB56 /* PlaylistRenameSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistRenameSheet.swift; sourceTree = "<group>"; };
+		50FA36582F5610010058AB56 /* DirectorySongListModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectorySongListModel.swift; sourceTree = "<group>"; };
+		50FA365A2F5610010058AB56 /* DirectorySongListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectorySongListView.swift; sourceTree = "<group>"; };
 		50FBE7DD262DD86500114278 /* BasicFetchedResultsController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BasicFetchedResultsController.swift; sourceTree = "<group>"; };
 		50FE808B26A55A8300CB434D /* Amperfy v13.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = "Amperfy v13.xcdatamodel"; sourceTree = "<group>"; };
 		50FE808C26A55CEA00CB434D /* DownloadMO+CoreDataClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DownloadMO+CoreDataClass.swift"; sourceTree = "<group>"; };
@@ -1860,6 +1866,9 @@
 				5007CE4021EF5F4300BC5CBA /* PlaylistsVC.swift */,
 				5007CE4621EF6A8E00BC5CBA /* PlaylistDetailVC.swift */,
 				502B98EC2D03A02D000FE187 /* PlaylistEditVC.swift */,
+				50FA36562F560F020058AB56 /* PlaylistRenameSheet.swift */,
+				50FA36582F5610010058AB56 /* DirectorySongListModel.swift */,
+				50FA365A2F5610010058AB56 /* DirectorySongListView.swift */,
 				50065EB321F0584D0066FC32 /* PlaylistSelectorVC.swift */,
 				50C16C0521E241B200F086F0 /* SearchVC.swift */,
 				5077F935221E6D0E0099CA91 /* DownloadsVC.swift */,
@@ -2588,6 +2597,9 @@
 				50CFB59A28D5009200A47D44 /* ArtworkDownloadSettingsView.swift in Sources */,
 				50DF1E5628DDE3FA00F3EA00 /* AlbumCollectionCell.swift in Sources */,
 				502B98ED2D03A02D000FE187 /* PlaylistEditVC.swift in Sources */,
+				50FA36572F560F020058AB56 /* PlaylistRenameSheet.swift in Sources */,
+				50FA36592F5610010058AB56 /* DirectorySongListModel.swift in Sources */,
+				50FA365B2F5610010058AB56 /* DirectorySongListView.swift in Sources */,
 				502041982E2A37F2003CE29A /* EqualizerSettingsView.swift in Sources */,
 				50E77DB928D21A9300BDF882 /* SettingsHostVC.swift in Sources */,
 				501DBE9F2632D2D000B31128 /* GenreDetailVC.swift in Sources */,
