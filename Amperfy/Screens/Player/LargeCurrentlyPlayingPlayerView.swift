@@ -459,20 +459,29 @@ class LargeCurrentlyPlayingPlayerView: UIView, UIGestureRecognizerDelegate {
 
   @IBAction
   func titlePressed(_ sender: Any) {
-    rootView?.displayAlbumDetail()
-    rootView?.displayPodcastDetail()
+    if rootView?.player.currentlyPlaying?.asSong != nil {
+      rootView?.displayAlbumDetail()
+    } else {
+      rootView?.displayPodcastDetail()
+    }
   }
 
   @IBAction
   func albumPressed(_ sender: Any) {
-    rootView?.displayAlbumDetail()
-    rootView?.displayPodcastDetail()
+    if rootView?.player.currentlyPlaying?.asSong != nil {
+      rootView?.displayAlbumDetail()
+    } else {
+      rootView?.displayPodcastDetail()
+    }
   }
 
   @IBAction
   func artistNamePressed(_ sender: Any) {
-    rootView?.displayArtistDetail()
-    rootView?.displayPodcastDetail()
+    if rootView?.player.currentlyPlaying?.asSong != nil {
+      rootView?.displayArtistDetail()
+    } else {
+      rootView?.displayPodcastDetail()
+    }
   }
 
   @IBAction

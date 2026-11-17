@@ -234,8 +234,9 @@ class TabBarVC: UITabBarController {
       container.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
       bottom,
     ])
-    // Keep a compact bar on classic (pre-bottomAccessory) layout, including iPad.
-    heightConstraint?.constant = 48.0
+    // Classic layout needs a bit more height so the progress thumb isn't clipped
+    // inside the rounded glass container (thumbless style is iOS 26+ only).
+    heightConstraint?.constant = 56.0
     view.bringSubviewToFront(container)
     notifyChildrenOfMiniPlayerInsetChange()
   }
@@ -297,8 +298,9 @@ class TabBarVC: UITabBarController {
       applyMiniPlayerLayout(isInline: isInline)
     } else {
       // Classic overlay mini-player: keep a fixed compact height on all size classes.
+      // 56pt leaves room for the default UISlider thumb inside clipsToBounds.
       // Do not poke child safe-area insets from layout — that causes a layout loop.
-      heightConstraint?.constant = 48.0
+      heightConstraint?.constant = 56.0
       centerConstraint?.isActive = false
       regularWidthConstraint?.isActive = false
       compactWidthConstraint?.isActive = false

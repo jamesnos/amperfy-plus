@@ -84,16 +84,29 @@ extension PopupPlayerVC {
           let viewToApper = viewToApper
     else { return }
 
-    if animated {
-      guard let artworkToDisapper = artworkToDisapper,
-            let artworkToApper = artworkToApper,
-            let detailsContainerToDisapper = detailsContainerToDisapper,
-            let detailsContainerToApper = detailsContainerToApper,
-            let favoriteToDisapper = favoriteToDisapper,
-            let favoriteToApper = favoriteToApper,
-            let optionsToDisapper = optionsToDisapper,
-            let optionsToApper = optionsToApper
-      else { return }
+    // Animation needs laid-out frames from both styles. On iOS 16 device this is often
+    // not ready yet when tapping artwork — fall back to an instant switch instead of crashing.
+    let canAnimate = animated
+      && artworkToDisapper != nil
+      && artworkToApper != nil
+      && detailsContainerToDisapper != nil
+      && detailsContainerToApper != nil
+      && favoriteToDisapper != nil
+      && favoriteToApper != nil
+      && optionsToDisapper != nil
+      && optionsToApper != nil
+      && (artworkToDisapper?.bounds.isEmpty == false)
+      && (artworkToApper?.bounds.isEmpty == false)
+
+    if canAnimate,
+       let artworkToDisapper,
+       let artworkToApper,
+       let detailsContainerToDisapper,
+       let detailsContainerToApper,
+       let favoriteToDisapper,
+       let favoriteToApper,
+       let optionsToDisapper,
+       let optionsToApper {
 
       // 1. Force autolayout to layout
       artworkToApper.layoutIfNeeded()

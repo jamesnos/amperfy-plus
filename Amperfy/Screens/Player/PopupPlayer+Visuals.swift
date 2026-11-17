@@ -135,10 +135,19 @@ extension PopupPlayerVC {
     }
     guard let artwork = artwork else { return }
     backgroundImage.image = artwork
-    artworkGradientColors = (try? artwork.dominantColors(max: 2)) ?? [
+    // DominantColors uses Metal CIContext; on some iOS 16 devices that can trap.
+    // Keep a safe theme fallback first, then try extraction.
+    artworkGradientColors = [
       themePreference.asColor,
       UIColor.systemBackground,
     ]
+    if #available(iOS 17.0, *) {
+      if let colors = try? artwork.dominantColors(max: 2), !colors.isEmpty {
+        artworkGradientColors = colors.count >= 2
+          ? Array(colors.prefix(2))
+          : [colors[0], UIColor.systemBackground]
+      }
+    }
     applyGradientBackground()
   }
 

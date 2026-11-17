@@ -93,6 +93,11 @@ class PlayerControlView: UIView {
     nextButton.tintColor = .label
     skipBackwardButton.tintColor = .label
     skipForwardButton.tintColor = .label
+    // XIB may reference an iOS 18+ symbol name; force the iOS 16-safe one.
+    airplayButton.setImage(
+      UIImage.airplayaudio.withConfiguration(UIImage.SymbolConfiguration(scale: .medium)),
+      for: .normal
+    )
     airplayButton.tintColor = .label
     playerModeButton.tintColor = .label
     volumeButton.tintColor = .label
@@ -183,7 +188,17 @@ class PlayerControlView: UIView {
 
   @IBAction
   func airplayButtonPushed(_ sender: UIButton) {
-    playerHandler?.airplayButtonPushed(rootView: self)
+    appDelegate.userStatistics.usedAction(.airplay)
+    #if targetEnvironment(macCatalyst)
+      playerHandler?.airplayButtonPushed(rootView: self)
+    #else
+      // Present from the popup VC so the route sheet works inside the page sheet.
+      guard let host = rootView else {
+        playerHandler?.airplayButtonPushed(rootView: self)
+        return
+      }
+      AirPlayRouter.present(from: host, sourceView: sender)
+    #endif
   }
 
   @IBAction
@@ -194,7 +209,8 @@ class PlayerControlView: UIView {
   func showVolumeSliderMenu() {
     let popoverContentController = SliderMenuPopover()
     let sliderMenuView = popoverContentController.sliderMenuView
-    sliderMenuView.frame = CGRect(x: 0, y: 0, width: 250, height: 50)
+    // Extra width for the AirPlay route picker beside the volume slider.
+    sliderMenuView.frame = CGRect(x: 0, y: 0, width: 290, height: 50)
 
     sliderMenuView.slider.minimumValue = 0
     sliderMenuView.slider.maximumValue = 100
@@ -202,6 +218,12 @@ class PlayerControlView: UIView {
 
     sliderMenuView.sliderValueChangedCB = {
       self.appDelegate.player.volume = Float(sliderMenuView.slider.value) / 100.0
+    }
+    sliderMenuView.airplayButtonPushedCB = { [weak self] in
+      guard let self, let host = self.rootView else { return }
+      popoverContentController.dismiss(animated: true) {
+        AirPlayRouter.present(from: host, sourceView: self.volumeButton)
+      }
     }
 
     popoverContentController.modalPresentationStyle = .popover

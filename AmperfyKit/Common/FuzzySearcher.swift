@@ -37,17 +37,32 @@ public class FuzzySearcher {
   )
     -> [PlayableContainable] {
     let fuse = Fuse()
-    // Improve performance by creating the pattern once
-    let pattern = fuse.createPattern(from: search)
+    // Normalize so apostrophes / punctuation don't tank the score.
+    let normalizedSearch = search.searchNormalized
+    let patternSource = normalizedSearch.isEmpty ? search : normalizedSearch
+    let pattern = fuse.createPattern(from: patternSource)
 
     var matches = [MatchResult]()
     items.forEach {
-      let result = fuse.search(pattern, in: $0.name)
+      let haystack = $0.name.searchNormalized
+      let result = fuse.search(pattern, in: haystack.isEmpty ? $0.name : haystack)
       if let result = result {
         matches.append(MatchResult(item: $0, score: result.score))
       }
     }
     let sortedMatches = matches.sorted(by: { $0.score < $1.score })
+    // If Fuse rejects everything (strict threshold), keep Core Data hits.
+    if sortedMatches.isEmpty, !items.isEmpty, !normalizedSearch.isEmpty {
+      let filtered = items.filter { item in
+        let name = item.name.searchNormalized
+        return name.contains(normalizedSearch) ||
+          normalizedSearch.split(separator: " ").allSatisfy { token in
+            name.contains(token)
+          }
+      }
+      if !filtered.isEmpty { return filtered }
+      return items
+    }
     return sortedMatches.compactMap { $0.item }
   }
 }

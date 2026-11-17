@@ -420,37 +420,54 @@ struct PlaylistGeneratorView: View {
 
   private var matchSummary: some View {
     HStack(spacing: MatchTableLayout.columnSpacing) {
-      summaryItem(
-        count: model.matchedCount,
-        singular: "matched",
-        plural: "matched",
-        symbol: "checkmark.circle.fill",
-        color: .green
-      )
-      summaryItem(
-        count: model.reviewCount,
-        singular: "needs review",
-        plural: "need review",
-        symbol: "exclamationmark.triangle.fill",
-        color: .orange
-      )
-      summaryItem(
-        count: model.missingCount,
-        singular: "missing",
-        plural: "missing",
-        symbol: "xmark.circle.fill",
-        color: .secondary
-      )
-      Spacer(minLength: MatchTableLayout.unit)
-      if !model.statusMessage.isEmpty {
-        Text(model.statusMessage)
-          .font(.subheadline)
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
+      HStack(spacing: MatchTableLayout.columnSpacing) {
+        summaryItem(
+          count: model.matchedCount,
+          singular: "matched",
+          plural: "matched",
+          symbol: "checkmark.circle.fill",
+          color: .green
+        )
+        summaryItem(
+          count: model.reviewCount,
+          singular: "needs review",
+          plural: "need review",
+          symbol: "exclamationmark.triangle.fill",
+          color: .orange
+        )
+        summaryItem(
+          count: model.missingCount,
+          singular: "missing",
+          plural: "missing",
+          symbol: "xmark.circle.fill",
+          color: .secondary
+        )
       }
+      .font(.subheadline)
+      .accessibilityElement(children: .combine)
+
+      Spacer(minLength: MatchTableLayout.unit)
+
+      HStack(spacing: MatchTableLayout.unit) {
+        Button {
+          model.shuffleRows()
+        } label: {
+          Label("Shuffle", systemImage: "shuffle")
+        }
+        .disabled(model.rows.count < 2 || model.isMatching)
+
+        Button {
+          model.acceptAllSuggestions()
+        } label: {
+          Label("Accept All", systemImage: "checkmark.circle")
+        }
+        .disabled(model.reviewCount == 0 || model.isMatching)
+        .accessibilityLabel("Accept all suggestions")
+      }
+      .buttonStyle(.bordered)
+      .controlSize(.small)
+      .labelStyle(.titleAndIcon)
     }
-    .font(.subheadline)
-    .accessibilityElement(children: .combine)
   }
 
   private func summaryItem(

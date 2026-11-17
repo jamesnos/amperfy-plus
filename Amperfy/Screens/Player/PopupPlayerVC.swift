@@ -318,10 +318,17 @@ class PopupPlayerVC: UIViewController, UIScrollViewDelegate {
         return
       }
     #endif
-    guard let hostingSplitVC = AppDelegate.mainWindowHostVC else { return }
-    hostingSplitVC.visualizePopupPlayer(direction: .close, animated: true, completion: { () in
-      hostingSplitVC.pushNavLibrary(vc: vc)
-    })
+    guard let hostVC = AppDelegate.mainWindowHostVC else { return }
+    let push = {
+      hostVC.pushNavLibrary(vc: vc)
+    }
+    // Dismiss this sheet directly — going through topViewController() + visualizePopupPlayer
+    // has been flaky when the popup is already presented (device-only crashes on iOS 16).
+    if presentingViewController != nil {
+      dismiss(animated: true, completion: push)
+    } else {
+      hostVC.visualizePopupPlayer(direction: .close, animated: true, completion: push)
+    }
   }
 
   #if targetEnvironment(macCatalyst)

@@ -71,14 +71,21 @@ class CurrentlyPlayingTableCell: BasicTableCell {
 
   @IBAction
   func titlePressed(_ sender: Any) {
-    rootView?.displayAlbumDetail()
-    rootView?.displayPodcastDetail()
+    // Only one navigation — calling both could start overlapping dismiss/push work.
+    if rootView?.player.currentlyPlaying?.asSong != nil {
+      rootView?.displayAlbumDetail()
+    } else {
+      rootView?.displayPodcastDetail()
+    }
   }
 
   @IBAction
   func artistNamePressed(_ sender: Any) {
-    rootView?.displayArtistDetail()
-    rootView?.displayPodcastDetail()
+    if rootView?.player.currentlyPlaying?.asSong != nil {
+      rootView?.displayArtistDetail()
+    } else {
+      rootView?.displayPodcastDetail()
+    }
   }
 
   @IBAction

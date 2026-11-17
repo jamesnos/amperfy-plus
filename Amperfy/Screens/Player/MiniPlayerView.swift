@@ -668,6 +668,15 @@ class MiniPlayerView: UIView {
     addSubview(playButton)
     addSubview(nextButton)
 
+    // iOS 26+ uses a thumbless slider flush to the bottom. On older OS the default
+    // UISlider thumb extends below the track and gets clipped by glassContainer.clipsToBounds.
+    let sliderBottomInset: CGFloat
+    if #available(iOS 26.0, *) {
+      sliderBottomInset = 0
+    } else {
+      sliderBottomInset = 10
+    }
+
     NSLayoutConstraint.activate([
       miniPlayerGotTouchedView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 0),
       miniPlayerGotTouchedView.heightAnchor.constraint(equalTo: heightAnchor),
@@ -679,7 +688,7 @@ class MiniPlayerView: UIView {
 
       timeSlider.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 6),
       timeSlider.heightAnchor.constraint(equalToConstant: 3),
-      timeSlider.bottomAnchor.constraint(equalTo: bottomAnchor),
+      timeSlider.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -sliderBottomInset),
       timeSlider.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -6),
 
       liveLabel.centerXAnchor.constraint(equalTo: timeSlider.centerXAnchor, constant: 0),
@@ -688,7 +697,7 @@ class MiniPlayerView: UIView {
       liveLabel.heightAnchor.constraint(equalTo: liveLabel.widthAnchor),
 
       artworkImage.topAnchor.constraint(equalTo: topAnchor, constant: 8),
-      artworkImage.bottomAnchor.constraint(equalTo: timeSlider.topAnchor, constant: -8),
+      artworkImage.bottomAnchor.constraint(equalTo: timeSlider.topAnchor, constant: -6),
       artworkImage.widthAnchor.constraint(equalTo: artworkImage.heightAnchor),
       artworkImage.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
 
@@ -698,7 +707,7 @@ class MiniPlayerView: UIView {
       titleLabel.trailingAnchor.constraint(equalTo: playButton.leadingAnchor, constant: -8),
 
       subtitleLabel.topAnchor.constraint(equalTo: playButton.centerYAnchor, constant: 0),
-      subtitleLabel.bottomAnchor.constraint(equalTo: timeSlider.topAnchor, constant: -8),
+      subtitleLabel.bottomAnchor.constraint(equalTo: timeSlider.topAnchor, constant: -6),
       subtitleLabel.leadingAnchor.constraint(equalTo: artworkImage.trailingAnchor, constant: 8),
       subtitleLabel.trailingAnchor.constraint(equalTo: playButton.leadingAnchor, constant: -8),
 
@@ -914,7 +923,8 @@ class MiniPlayerView: UIView {
   func showVolumeSliderMenu() {
     let popoverContentController = SliderMenuPopover()
     let sliderMenuView = popoverContentController.sliderMenuView
-    sliderMenuView.frame = CGRect(x: 0, y: 0, width: 250, height: 50)
+    // Extra width for the AirPlay route picker beside the volume slider.
+    sliderMenuView.frame = CGRect(x: 0, y: 0, width: 290, height: 50)
 
     sliderMenuView.slider.minimumValue = 0
     sliderMenuView.slider.maximumValue = 100
@@ -922,6 +932,14 @@ class MiniPlayerView: UIView {
 
     sliderMenuView.sliderValueChangedCB = {
       self.appDelegate.player.volume = Float(sliderMenuView.slider.value) / 100.0
+    }
+    sliderMenuView.airplayButtonPushedCB = { [weak self] in
+      guard let self,
+            let host = AppDelegate.mainWindowHostVC as? UIViewController
+      else { return }
+      popoverContentController.dismiss(animated: true) {
+        AirPlayRouter.present(from: host, sourceView: self.volumeButton)
+      }
     }
 
     popoverContentController.modalPresentationStyle = .popover

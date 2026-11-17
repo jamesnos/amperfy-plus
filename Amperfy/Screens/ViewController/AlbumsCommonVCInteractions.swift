@@ -52,8 +52,22 @@ class SliderMenuView: UIView {
     return slider
   }()
 
+  /// AirPlay button in the volume popover (nested pickers fail inside iPad sheets).
+  let airplayButton: UIButton = {
+    let button = UIButton(type: .system)
+    button.translatesAutoresizingMaskIntoConstraints = false
+    button.setImage(
+      UIImage.airplayaudio.withConfiguration(UIImage.SymbolConfiguration(scale: .medium)),
+      for: .normal
+    )
+    button.tintColor = .label
+    button.accessibilityLabel = "AirPlay"
+    return button
+  }()
+
   var stepValue: Float = 1.0
   var sliderValueChangedCB: VoidFunctionCallback?
+  var airplayButtonPushedCB: VoidFunctionCallback?
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -67,14 +81,30 @@ class SliderMenuView: UIView {
 
   private func setupView() {
     addSubview(slider)
-    slider.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10).isActive = true
-    slider.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10).isActive = true
+    slider.addTarget(self, action: #selector(sliderValueChanged(_:)), for: .valueChanged)
+
     #if targetEnvironment(macCatalyst)
+      slider.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10).isActive = true
+      slider.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10).isActive = true
       slider.centerYAnchor.constraint(equalTo: centerYAnchor).isActive = true
     #else
+      addSubview(airplayButton)
+      airplayButton.addTarget(self, action: #selector(airplayPressed), for: .touchUpInside)
+      slider.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10).isActive = true
+      slider.trailingAnchor.constraint(equalTo: airplayButton.leadingAnchor, constant: -8)
+        .isActive = true
       slider.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -6).isActive = true
+
+      airplayButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8).isActive = true
+      airplayButton.centerYAnchor.constraint(equalTo: slider.centerYAnchor).isActive = true
+      airplayButton.widthAnchor.constraint(equalToConstant: 28).isActive = true
+      airplayButton.heightAnchor.constraint(equalToConstant: 28).isActive = true
     #endif
-    slider.addTarget(self, action: #selector(sliderValueChanged(_:)), for: .valueChanged)
+  }
+
+  @objc
+  private func airplayPressed() {
+    airplayButtonPushedCB?()
   }
 
   @objc
@@ -367,7 +397,7 @@ class AlbumsCommonVCInteractions {
 
     let popoverContentController = SliderMenuPopover()
     let sliderMenuView = popoverContentController.sliderMenuView
-    sliderMenuView.frame = CGRect(x: 0, y: 0, width: 250, height: 50)
+    sliderMenuView.frame = CGRect(x: 0, y: 0, width: 290, height: 50)
 
     if UIDevice.current.userInterfaceIdiom == .mac {
       sliderMenuView.slider.minimumValue = 3
@@ -455,25 +485,25 @@ class AlbumsCommonVCInteractions {
     )
   }
 
-  private func createActionButtonMenu() -> UIMenu {
-    let action = UIAction(
+  private func albumsForCurrentFilter() -> [Album] {
+    switch displayFilter {
+    case .all:
+      return appDelegate.storage.main.library.getAlbums(for: account)
+    case .newest:
+      return appDelegate.storage.main.library.getNewestAlbums(for: account)
+    case .recent:
+      return appDelegate.storage.main.library.getRecentAlbums(for: account)
+    case .favorites:
+      return appDelegate.storage.main.library.getFavoriteAlbums(for: account)
+    }
+  }
+
+  private func createDownloadAlbumsAction() -> UIAction {
+    UIAction(
       title: "Download \(filterTitle)",
       image: UIImage.startDownload,
       handler: { _ in
-        var albums = [Album]()
-        switch self.displayFilter {
-        case .all:
-          albums = self.appDelegate.storage.main.library.getAlbums(for: self.account)
-        case .newest:
-          albums = self.appDelegate.storage.main.library
-            .getNewestAlbums(for: self.account)
-        case .recent:
-          albums = self.appDelegate.storage.main.library
-            .getRecentAlbums(for: self.account)
-        case .favorites:
-          albums = self.appDelegate.storage.main.library
-            .getFavoriteAlbums(for: self.account)
-        }
+        let albums = self.albumsForCurrentFilter()
         let albumSongs = Array(albums.compactMap { $0.playables }.joined())
         if albumSongs.count > AppDelegate.maxPlayablesDownloadsToAddAtOnceWithoutWarning {
           let alert = UIAlertController(
@@ -493,7 +523,79 @@ class AlbumsCommonVCInteractions {
         }
       }
     )
-    return UIMenu(options: [.displayInline], children: [action])
+  }
+
+  private func createDownloadAlbumListAction() -> UIAction {
+    UIAction(title: "Download Album List", image: .doc) { _ in
+      self.saveAlbumList()
+    }
+  }
+
+  private func createActionButtonMenu() -> UIMenu {
+    var actions = [UIAction]()
+    if appDelegate.storage.settings.user.isOnlineMode {
+      actions.append(createDownloadAlbumsAction())
+    }
+    actions.append(createDownloadAlbumListAction())
+    return UIMenu(options: [.displayInline], children: actions)
+  }
+
+  private func saveAlbumList() {
+    let lines = albumsForCurrentFilter()
+      .sorted { lhs, rhs in
+        let artistL = lhs.artist?.name ?? ""
+        let artistR = rhs.artist?.name ?? ""
+        let artistOrder = artistL.localizedStandardCompare(artistR)
+        if artistOrder != .orderedSame { return artistOrder == .orderedAscending }
+        return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+      }
+      .map { album in
+        let artist = album.artist?.name ?? "Unknown Artist"
+        return "\(artist) - \(album.name)"
+      }
+    let text = lines.joined(separator: "\n")
+    do {
+      let fileURL = try Self.writeAlbumList(text, named: filterTitle)
+      appDelegate.eventLogger.info(
+        topic: "Album List",
+        message: "Saved \(fileURL.lastPathComponent) to Downloads"
+      )
+    } catch {
+      appDelegate.eventLogger.report(topic: "Album List", error: error)
+    }
+  }
+
+  private static func writeAlbumList(_ text: String, named baseName: String) throws -> URL {
+    guard let downloads = FileManager.default.urls(
+      for: .downloadsDirectory,
+      in: .userDomainMask
+    ).first else {
+      throw CocoaError(.fileNoSuchFile)
+    }
+    let accessing = downloads.startAccessingSecurityScopedResource()
+    defer {
+      if accessing { downloads.stopAccessingSecurityScopedResource() }
+    }
+    try FileManager.default.createDirectory(
+      at: downloads,
+      withIntermediateDirectories: true
+    )
+    let fileURL = uniqueFileURL(in: downloads, baseName: baseName)
+    let body = text.isEmpty ? text : text + "\n"
+    try body.write(to: fileURL, atomically: true, encoding: .utf8)
+    return fileURL
+  }
+
+  private static func uniqueFileURL(in directory: URL, baseName: String) -> URL {
+    let manager = FileManager.default
+    let first = directory.appendingPathComponent("\(baseName).txt")
+    if !manager.fileExists(atPath: first.path) { return first }
+    var index = 2
+    while true {
+      let candidate = directory.appendingPathComponent("\(baseName) \(index).txt")
+      if !manager.fileExists(atPath: candidate.path) { return candidate }
+      index += 1
+    }
   }
 
   private var displayedSongs: [AbstractPlayable] {

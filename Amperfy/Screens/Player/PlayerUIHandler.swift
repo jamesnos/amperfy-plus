@@ -20,6 +20,7 @@
 //
 
 import AmperfyKit
+import AVKit
 import MediaPlayer
 import UIKit
 
@@ -357,17 +358,25 @@ class PlayerUIHandler: NSObject {
         UIApplication.shared.open(url)
       }
     #else
-      let rect = CGRect(x: -100, y: 0, width: 0, height: 0)
-      let airplayVolume = MPVolumeView(frame: rect)
-      airplayVolume.showsVolumeSlider = false
-      rootView.addSubview(airplayVolume)
-      for view: UIView in airplayVolume.subviews {
+      // AVRoutePickerView is the supported AirPlay entry point; MPVolumeView route
+      // hacking is deprecated and often no-ops on iPadOS 16.
+      let picker = AVRoutePickerView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
+      picker.prioritizesVideoDevices = false
+      picker.isHidden = true
+      rootView.addSubview(picker)
+      rootView.layoutIfNeeded()
+      var didTrigger = false
+      for view in picker.subviews {
         if let button = view as? UIButton {
           button.sendActions(for: .touchUpInside)
+          didTrigger = true
           break
         }
       }
-      airplayVolume.removeFromSuperview()
+      // Keep the picker alive briefly so the system route sheet can present.
+      DispatchQueue.main.asyncAfter(deadline: .now() + (didTrigger ? 2.0 : 0.1)) {
+        picker.removeFromSuperview()
+      }
     #endif
   }
 
@@ -376,16 +385,33 @@ class PlayerUIHandler: NSObject {
       .availableApiTypes.contains(.subsonic)
   }
 
+  /// `Int(nan)` / `Int(inf)` traps on device; streaming duration can be non-finite briefly.
+  private static func safeClockSeconds(_ value: Double) -> Int {
+    guard value.isFinite else { return 0 }
+    if value >= Double(Int.max) { return Int.max }
+    if value <= Double(Int.min) { return Int.min }
+    return Int(value)
+  }
+
+  private static func safeSliderValue(_ value: Double) -> Float {
+    guard value.isFinite, value >= 0 else { return 0 }
+    return Float(value)
+  }
+
   private var remainingTime: Int? {
     let duration = player.duration
-    if player.currentlyPlaying != nil, duration.isNormal, !duration.isZero {
-      return Int(player.elapsedTime - ceil(player.duration))
-    }
-    return nil
+    let elapsed = player.elapsedTime
+    guard player.currentlyPlaying != nil,
+          duration.isFinite, duration > 0,
+          elapsed.isFinite
+    else { return nil }
+    return Self.safeClockSeconds(elapsed - ceil(duration))
   }
 
   func timeSliderChanged(timeSlider: UISlider) {
-    player.seek(toSecond: Double(timeSlider.value))
+    let seconds = Double(timeSlider.value)
+    guard seconds.isFinite else { return }
+    player.seek(toSecond: seconds)
   }
 
   func timeSliderIsChanging(
@@ -393,10 +419,15 @@ class PlayerUIHandler: NSObject {
     elapsedTimeLabel: UILabel,
     remainingTimeLabel: UILabel
   ) {
-    let elapsedClockTime = ClockTime(timeInSeconds: Int(timeSlider.value))
+    let elapsedClockTime = ClockTime(timeInSeconds: Self.safeClockSeconds(Double(timeSlider.value)))
     elapsedTimeLabel.text = elapsedClockTime.asShortString()
+    let duration = player.duration
+    guard duration.isFinite, duration > 0 else {
+      remainingTimeLabel.text = "--:--"
+      return
+    }
     let remainingTime =
-      ClockTime(timeInSeconds: Int(Double(timeSlider.value) - ceil(player.duration)))
+      ClockTime(timeInSeconds: Self.safeClockSeconds(Double(timeSlider.value) - ceil(duration)))
     remainingTimeLabel.text = remainingTime.asShortString()
   }
 
@@ -416,16 +447,23 @@ class PlayerUIHandler: NSObject {
       let supportTimeInteraction = !currentlyPlaying.isRadio
       timeSlider.isEnabled = supportTimeInteraction && (style != .miniPlayeriOS)
       timeSlider.minimumValue = 0.0
-      timeSlider.maximumValue = Float(player.duration)
+      let duration = player.duration
+      let elapsed = player.elapsedTime
+      // Never feed NaN/0-max into UISlider — that crashes on some iOS 16 devices.
+      if duration.isFinite, duration > 0 {
+        timeSlider.maximumValue = Self.safeSliderValue(duration)
+      } else {
+        timeSlider.maximumValue = 1.0
+      }
       if !timeSlider.isTracking, supportTimeInteraction {
-        let elapsedClockTime = ClockTime(timeInSeconds: Int(player.elapsedTime))
+        let elapsedClockTime = ClockTime(timeInSeconds: Self.safeClockSeconds(elapsed))
         elapsedTimeLabel.text = elapsedClockTime.asShortString()
         if let remainingTime = remainingTime {
           remainingTimeLabel.text = ClockTime(timeInSeconds: remainingTime).asShortString()
         } else {
           remainingTimeLabel.text = "--:--"
         }
-        timeSlider.value = Float(player.elapsedTime)
+        timeSlider.value = Self.safeSliderValue(elapsed)
       }
 
       if !supportTimeInteraction {

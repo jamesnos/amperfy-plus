@@ -149,6 +149,19 @@ extension String {
     lowercased().contains(searchText.lowercased())
   }
 
+  /// Letter/digit runs used for punctuation-tolerant library search.
+  /// "Can't tell me nothing" → ["can", "tell", "me", "nothing"] (drops 1-char scraps).
+  public var searchAlphanumericTokens: [String] {
+    folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+      .components(separatedBy: CharacterSet.alphanumerics.inverted)
+      .filter { $0.count >= 2 }
+  }
+
+  /// Compact form for fuzzy compare: "Can't Tell Me Nothing" → "cant tell me nothing".
+  public var searchNormalized: String {
+    searchAlphanumericTokens.joined(separator: " ")
+  }
+
   public func isContainedIn(_ container: [String]) -> Bool {
     container.contains(self)
   }

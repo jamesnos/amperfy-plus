@@ -151,6 +151,22 @@ final class PlaylistGeneratorModel: ObservableObject {
     rows.move(fromOffsets: source, toOffset: destination)
   }
 
+  func shuffleRows() {
+    guard rows.count > 1 else { return }
+    rows.shuffle()
+  }
+
+  /// Confirm every needs-review row using its current top suggestion.
+  func acceptAllSuggestions() {
+    for index in rows.indices where rows[index].status == .needsReview {
+      guard let suggestion = rows[index].suggestion else { continue }
+      rows[index].selected = suggestion
+      rows[index].confirmed = true
+      rows[index].skipped = false
+    }
+    reviewingRowID = nil
+  }
+
   func deleteRow(id: UUID) {
     guard let index = rows.firstIndex(where: { $0.id == id }) else { return }
     let row = rows.remove(at: index)

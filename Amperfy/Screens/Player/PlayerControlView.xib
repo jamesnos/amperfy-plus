@@ -131,7 +131,7 @@
                             <color key="tintColor" systemColor="labelColor"/>
                             <state key="normal">
                                 <color key="titleColor" systemColor="labelColor"/>
-                                <imageReference key="image" image="airplay.audio" catalog="system" symbolScale="medium"/>
+                                <imageReference key="image" image="airplayaudio" catalog="system" symbolScale="medium"/>
                             </state>
                             <connections>
                                 <action selector="airplayButtonPushed:" destination="iN0-l3-epB" eventType="touchUpInside" id="YPY-8P-oS2"/>
@@ -295,7 +295,7 @@
     <resources>
         <image name="10.arrow.trianglehead.clockwise" catalog="system" width="119" height="128"/>
         <image name="10.arrow.trianglehead.counterclockwise" catalog="system" width="119" height="128"/>
-        <image name="airplay.audio" catalog="system" width="128" height="123"/>
+        <image name="airplayaudio" catalog="system" width="128" height="123"/>
         <image name="antenna.radiowaves.left.and.right" catalog="system" width="128" height="111"/>
         <image name="backward.fill" catalog="system" width="128" height="76"/>
         <image name="ellipsis" catalog="system" width="128" height="37"/>

@@ -164,7 +164,9 @@ class AlbumDetailVC: SingleSnapshotFetchedResultsTableViewController<SongMO> {
     defer { songToScrollTo = nil }
     guard let songToScrollTo = songToScrollTo,
           let indexPath = fetchedResultsController.fetchResultsController
-          .indexPath(forObject: songToScrollTo.managedObject)
+          .indexPath(forObject: songToScrollTo.managedObject),
+          tableView.numberOfSections > indexPath.section,
+          tableView.numberOfRows(inSection: indexPath.section) > indexPath.row
     else { return }
     tableView.scrollToRow(at: indexPath, at: .top, animated: true)
   }

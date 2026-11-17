@@ -46,11 +46,27 @@ extension CoreDataIdentifyable {
   }
 
   static func getIdentifierBasedSearchPredicate(searchText: String) -> NSPredicate {
-    var predicate = NSPredicate(value: true)
-    if !searchText.isEmpty {
-      predicate = NSPredicate(format: "%K contains[cd] %@", Self.identifierKeyString, searchText)
+    guard !searchText.isEmpty else { return NSPredicate(value: true) }
+
+    // Tokenize on non-alphanumerics so "Can't tell me nothing" matches titles with
+    // curly/straight apostrophes (or none). Full-string CONTAINS fails across those.
+    let tokens = searchText.searchAlphanumericTokens
+    if tokens.isEmpty {
+      return NSPredicate(format: "%K contains[cd] %@", Self.identifierKeyString, searchText)
     }
-    return predicate
+
+    let tokenPredicates = tokens.map { token in
+      NSPredicate(format: "%K contains[cd] %@", Self.identifierKeyString, token)
+    }
+    let allTokensMatch = NSCompoundPredicate(andPredicateWithSubpredicates: tokenPredicates)
+
+    // Keep an exact-ish full-string path for short / punctuated queries.
+    let fullStringMatch = NSPredicate(
+      format: "%K contains[cd] %@",
+      Self.identifierKeyString,
+      searchText
+    )
+    return NSCompoundPredicate(orPredicateWithSubpredicates: [fullStringMatch, allTokensMatch])
   }
 
   static var identifierSortedFetchRequest: NSFetchRequest<Self> {
